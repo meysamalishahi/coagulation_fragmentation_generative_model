@@ -1,7 +1,0 @@
-{
-  "stage": "shape_training",
-  "message": "waiting for detached full shape training",
-  "updated_unix": 1790970687.880416,
-  "latest_checkpoint_step": 68000,
-  "restart_count": 0
-}

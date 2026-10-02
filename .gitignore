@@ -13,6 +13,7 @@ results/**/*.npz
 results/**/*.npy
 results/**/*.log
 results/**/*.pid
+results/gpu_official/fair_comparison/supervisor_status.json
 
 # LaTeX build products (keep the source and rendered paper PDF)
 *.aux
