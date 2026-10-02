@@ -1,0 +1,151 @@
+{
+  "environment": {
+    "python": "3.10.17",
+    "torch": "2.7.0+cu126",
+    "device": "cuda",
+    "device_name": "NVIDIA RTX A5000"
+  },
+  "dataset": {
+    "name": "CaloChallenge Dataset 1 photons",
+    "train_file": "/home/kwesi/Desktop/Meysam/Meysam/Condensation Generative Modles/data/calochallenge/dataset_1_photons/dataset_1_photons_1.hdf5",
+    "geometry_file": "/home/kwesi/Desktop/Meysam/Meysam/Condensation Generative Modles/external/calochallenge-homepage/code/binning_dataset_1_photons.xml",
+    "layer_ids": [
+      0,
+      1,
+      2,
+      3,
+      12
+    ],
+    "split": [
+      8000,
+      256
+    ],
+    "full_voxel_count": 368
+  },
+  "run_config": {
+    "seed": 20261003,
+    "train_size": 8000,
+    "validation_size": 256,
+    "iterations": 100,
+    "batch_size": 64,
+    "validation_batch_size": 64,
+    "validation_every": 50,
+    "validation_samples": 64,
+    "learning_rate": 0.0001,
+    "weight_decay": 0.1,
+    "core_components": 48,
+    "hidden_dim": 480,
+    "transformer_layers": 6,
+    "attention_heads": 6,
+    "mixture_components": 16,
+    "residual_hidden_dim": 1536,
+    "residual_layers": 4,
+    "residual_loss_weight": 1.0
+  },
+  "model_config": {
+    "voxel_count": 368,
+    "layer_count": 5,
+    "condition_dim": 6,
+    "core_components": 48,
+    "hidden_dim": 480,
+    "transformer_layers": 6,
+    "attention_heads": 6,
+    "mixture_components": 16,
+    "residual_hidden_dim": 1536,
+    "residual_layers": 4,
+    "minimum_concentration": 0.01,
+    "maximum_concentration": 100.0,
+    "target_smoothing": 1e-06
+  },
+  "corruption_config": {
+    "horizon": 1.0,
+    "switch_time": 0.5,
+    "split_rate": 0.0,
+    "gamma": 0.0,
+    "max_components": 48,
+    "split_beta": 2.0,
+    "separation_scale": 0.35
+  },
+  "energy_transform": {
+    "incident_log_mean": 9.445873473856558,
+    "incident_log_std": 2.5110252435497,
+    "target_mean": [
+      -0.038425208218416405,
+      -5.498862219418981,
+      -0.9864573727476549,
+      7.862654742818281,
+      2.9101023035346896
+    ],
+    "target_std": [
+      0.13446873730399914,
+      3.695942249784224,
+      1.9348495201012068,
+      4.126169223993826,
+      5.5027497446644
+    ],
+    "layer_ids": [
+      0,
+      1,
+      2,
+      3,
+      12
+    ],
+    "epsilon": 1e-06,
+    "max_response": 4.0
+  },
+  "parameter_count": 25944964,
+  "reference_parameter_count": 25982005,
+  "parameter_difference_fraction": -0.0014256405539141417,
+  "checkpoint_selection": "final_step",
+  "final_validation": {
+    "loss": 2.02374804019928,
+    "count_nll": 2.3848392963409424,
+    "birth_nll": 2.854077637195587,
+    "residual_nll": -3.2151689529418945,
+    "residual_cross_entropy": 3.3308318853378296
+  },
+  "best_validation_loss": 2.02374804019928,
+  "training_seconds": 36.774246401153505,
+  "sample_metrics": {
+    "mean_profile_l1": 0.88228440284729,
+    "reference_active_cells_mean": 224.03125,
+    "generated_active_cells_mean": 160.875,
+    "active_cells_mean_error": 63.15625,
+    "layer_conservation_max_mev": 0.3125,
+    "milliseconds_per_shower": 14.859816394164227,
+    "peak_gpu_memory_mb": 792.59228515625,
+    "incident_response_mean": 0.9640392661094666
+  },
+  "history": [
+    {
+      "step": 50,
+      "train_loss": 3.69028582572937,
+      "train_count_nll": 3.218452253341675,
+      "train_birth_nll": 3.5775791025161743,
+      "train_residual_nll": -3.105745568275452,
+      "train_residual_cross_entropy": 3.330543975830078,
+      "validation_loss": 2.462232291698456,
+      "validation_count_nll": 2.6078094244003296,
+      "validation_birth_nll": 3.0537405014038086,
+      "validation_residual_nll": -3.1993176341056824,
+      "validation_residual_cross_entropy": 3.3340286016464233,
+      "learning_rate": 5.0000000000000057e-05,
+      "training_seconds": 18.01050645764917
+    },
+    {
+      "step": 100,
+      "train_loss": 2.215513815879822,
+      "train_count_nll": 2.380735478401184,
+      "train_birth_nll": 2.9713588428497313,
+      "train_residual_nll": -3.1365805196762087,
+      "train_residual_cross_entropy": 3.31781156539917,
+      "validation_loss": 2.02374804019928,
+      "validation_count_nll": 2.3848392963409424,
+      "validation_birth_nll": 2.854077637195587,
+      "validation_residual_nll": -3.2151689529418945,
+      "validation_residual_cross_entropy": 3.3308318853378296,
+      "learning_rate": 0.0,
+      "training_seconds": 36.01768249832094
+    }
+  ]
+}

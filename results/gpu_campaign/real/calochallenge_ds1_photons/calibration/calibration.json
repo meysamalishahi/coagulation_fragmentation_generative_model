@@ -1,0 +1,171 @@
+{
+  "source_run": "/home/kwesi/Desktop/Meysam/Meysam/Condensation Generative Modles/results/gpu_campaign/real/calochallenge_ds1_photons",
+  "selection_data": "held-out training-file validation split only",
+  "test_policy": "one evaluation after fixing calibration",
+  "validation_samples": 200,
+  "test_samples": 1000,
+  "seed": 20271001,
+  "grid": [
+    {
+      "leaf_temperature": 0.7,
+      "merge_rate_scale": 1.0,
+      "validation_cardinality_tv": 0.35000000000000003,
+      "validation_overflow_rate": 0.255,
+      "validation_retained_response_w1": 0.3758507692966349,
+      "validation_spatial_spread_w1": 0.19775404931943882,
+      "validation_summary_mmd": 0.5051970148650452,
+      "milliseconds_per_sample": 1341.0034542996436
+    },
+    {
+      "leaf_temperature": 0.7,
+      "merge_rate_scale": 1.5,
+      "validation_cardinality_tv": 0.29000000000000004,
+      "validation_overflow_rate": 0.055,
+      "validation_retained_response_w1": 0.37198933454128724,
+      "validation_spatial_spread_w1": 0.1846073704631517,
+      "validation_summary_mmd": 0.48223462261499384,
+      "milliseconds_per_sample": 1824.8391848849133
+    },
+    {
+      "leaf_temperature": 0.7,
+      "merge_rate_scale": 2.0,
+      "validation_cardinality_tv": 0.38499999999999995,
+      "validation_overflow_rate": 0.015,
+      "validation_retained_response_w1": 0.3695708041355945,
+      "validation_spatial_spread_w1": 0.1618545146941265,
+      "validation_summary_mmd": 0.5149856917779098,
+      "milliseconds_per_sample": 2221.540735256858
+    },
+    {
+      "leaf_temperature": 0.7,
+      "merge_rate_scale": 3.0,
+      "validation_cardinality_tv": 0.6549999999999999,
+      "validation_overflow_rate": 0.005,
+      "validation_retained_response_w1": 0.36128460485227776,
+      "validation_spatial_spread_w1": 0.11366385297723695,
+      "validation_summary_mmd": 0.5520969204390915,
+      "milliseconds_per_sample": 2848.2394507573918
+    },
+    {
+      "leaf_temperature": 1.0,
+      "merge_rate_scale": 1.0,
+      "validation_cardinality_tv": 0.32,
+      "validation_overflow_rate": 0.145,
+      "validation_retained_response_w1": 0.3435582192609385,
+      "validation_spatial_spread_w1": 0.18695190698294734,
+      "validation_summary_mmd": 0.47178564759990516,
+      "milliseconds_per_sample": 1170.710234460421
+    },
+    {
+      "leaf_temperature": 1.0,
+      "merge_rate_scale": 1.5,
+      "validation_cardinality_tv": 0.37,
+      "validation_overflow_rate": 0.05,
+      "validation_retained_response_w1": 0.34355286883053554,
+      "validation_spatial_spread_w1": 0.16286321179387556,
+      "validation_summary_mmd": 0.4760060890989528,
+      "milliseconds_per_sample": 1602.9121611081064
+    },
+    {
+      "leaf_temperature": 1.0,
+      "merge_rate_scale": 2.0,
+      "validation_cardinality_tv": 0.5,
+      "validation_overflow_rate": 0.0,
+      "validation_retained_response_w1": 0.3562722056977711,
+      "validation_spatial_spread_w1": 0.1525420571493201,
+      "validation_summary_mmd": 0.4888190744310751,
+      "milliseconds_per_sample": 1985.34221555572
+    },
+    {
+      "leaf_temperature": 1.0,
+      "merge_rate_scale": 3.0,
+      "validation_cardinality_tv": 0.7150000000000001,
+      "validation_overflow_rate": 0.0,
+      "validation_retained_response_w1": 0.3442133909256496,
+      "validation_spatial_spread_w1": 0.1109219593897883,
+      "validation_summary_mmd": 0.5228364128347489,
+      "milliseconds_per_sample": 2592.839288120158
+    },
+    {
+      "leaf_temperature": 1.3,
+      "merge_rate_scale": 1.0,
+      "validation_cardinality_tv": 0.41000000000000003,
+      "validation_overflow_rate": 0.145,
+      "validation_retained_response_w1": 0.3181663896009288,
+      "validation_spatial_spread_w1": 0.18184964827593345,
+      "validation_summary_mmd": 0.4693786957576217,
+      "milliseconds_per_sample": 1050.264817844145
+    },
+    {
+      "leaf_temperature": 1.3,
+      "merge_rate_scale": 1.5,
+      "validation_cardinality_tv": 0.445,
+      "validation_overflow_rate": 0.045,
+      "validation_retained_response_w1": 0.33112520176019417,
+      "validation_spatial_spread_w1": 0.15821224617765087,
+      "validation_summary_mmd": 0.48088325978795643,
+      "milliseconds_per_sample": 1484.4263123720884
+    },
+    {
+      "leaf_temperature": 1.3,
+      "merge_rate_scale": 2.0,
+      "validation_cardinality_tv": 0.6000000000000001,
+      "validation_overflow_rate": 0.0,
+      "validation_retained_response_w1": 0.3266588907863229,
+      "validation_spatial_spread_w1": 0.12328899070558082,
+      "validation_summary_mmd": 0.4784649770573828,
+      "milliseconds_per_sample": 1734.9717514868826
+    },
+    {
+      "leaf_temperature": 1.3,
+      "merge_rate_scale": 3.0,
+      "validation_cardinality_tv": 0.745,
+      "validation_overflow_rate": 0.0,
+      "validation_retained_response_w1": 0.3225410359702855,
+      "validation_spatial_spread_w1": 0.09820633880396784,
+      "validation_summary_mmd": 0.5327939115146115,
+      "milliseconds_per_sample": 2274.3951597856358
+    }
+  ],
+  "selected": {
+    "leaf_temperature": 0.7,
+    "merge_rate_scale": 1.5,
+    "validation_cardinality_tv": 0.29000000000000004,
+    "validation_retained_response_w1": 0.37198933454128724
+  },
+  "uncalibrated_test_metrics": {
+    "cardinality_tv": 0.347,
+    "retained_response_w1": 0.35556965100787413,
+    "longitudinal_centroid_w1": 0.04349016965572544,
+    "transverse_centroid_x_w1": 0.059037103424358105,
+    "transverse_centroid_y_w1": 0.06352699113846974,
+    "spatial_spread_w1": 0.18962065077759838,
+    "summary_mmd": 0.6498585956649501,
+    "summary_energy_distance": 0.9324540384113614,
+    "classifier_two_sample_accuracy": 0.9775,
+    "coordinate_out_of_geometry_fraction": 0.01737898403785161,
+    "mass_residual_mean": 0.0,
+    "mass_residual_max": 0.0,
+    "empty_sample_rate": 0.001,
+    "milliseconds_per_sample": 2700.844824248925,
+    "peak_gpu_memory_mb": 37.34814453125
+  },
+  "calibrated_test_metrics": {
+    "cardinality_tv": 0.21199999999999997,
+    "retained_response_w1": 0.37758609724043685,
+    "longitudinal_centroid_w1": 0.04179423264575756,
+    "transverse_centroid_x_w1": 0.0642564376572585,
+    "transverse_centroid_y_w1": 0.06168828932701091,
+    "spatial_spread_w1": 0.1805173296064907,
+    "summary_mmd": 0.6645047125055568,
+    "summary_energy_distance": 1.0144789163141223,
+    "classifier_two_sample_accuracy": 0.97125,
+    "coordinate_out_of_geometry_fraction": 0.014398546166212344,
+    "mass_residual_mean": 2.220446049250313e-19,
+    "mass_residual_max": 1.1102230246251565e-16,
+    "empty_sample_rate": 0.0,
+    "overflow_rate": 0.082,
+    "milliseconds_per_sample": 1836.7504883026704,
+    "peak_gpu_memory_mb": 18.2333984375
+  }
+}

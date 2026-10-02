@@ -1,0 +1,14 @@
+name,passed,metric,tolerance,detail,seconds
+event_maps_and_conservation,True,5.551115123125783e-16,2e-12,split/merge and delete/birth inversion,0.03454737504944205
+closed_form_flow,True,3.725609571987861e-16,2e-12,flow conservation and inverse flow,0.007781667169183493
+normalized_encoder_decoder,True,2.220446049250313e-16,2e-12,raw weights recovered after reservoir augmentation,0.007419208064675331
+split_jacobian,True,4.6467735446251003e-10,2e-07,finite-difference determinant versus parent mass m,0.007029291708022356
+dequantization_jacobian,True,4.046478313739246e-10,1e-06,finite-difference determinant versus M^n(1-xi)^(n-1),0.00378266628831625
+flow_jacobian,True,1.4046755598439278e-09,1e-06,finite-difference determinant versus alpha^(n-1) f'(c),0.00362229160964489
+split_change_of_variables,True,0.0026825352492236883,0.008,independent Monte Carlo integrals; validates dy=m dx and reverse 1/m,0.5644091670401394
+finite_exact_time_reversal,True,2.220446049250313e-16,2e-10,flux equality and q R = -p G,0.15358137479051948
+finite_reverse_rate_mle,True,0.005411051564748159,0.012,tabular marked-rate MLE versus analytical reverse rates,0.466690540779382
+uniform_birth_bridge,True,0.000998101905545011,0.0025,order-statistic means k S/(L+1),0.982300375122577
+survival_integral_estimator,True,0.00029121629563277907,0.0025,uniform-time Monte Carlo versus exact integral,0.029993999749422073
+constant_rate_path_likelihood,True,0.001188219418610914,0.004,mean exponential-event NLL versus analytic expectation,0.16197583312168717
+constant_rate_thinning,True,0.002045105542949166,0.005,accepted waiting-time mean versus Exp(rate),0.08379791676998138

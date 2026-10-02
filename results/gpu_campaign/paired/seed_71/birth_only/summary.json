@@ -1,0 +1,86 @@
+{
+  "environment": {
+    "python": "3.10.17",
+    "platform": "Linux-5.15.0-139-generic-x86_64-with-glibc2.31",
+    "torch": "2.7.0+cu126",
+    "cuda_available": true,
+    "cuda_version": "12.6",
+    "device": "cuda",
+    "device_name": "NVIDIA RTX A5000"
+  },
+  "synthetic_config": {
+    "min_cardinality": 2,
+    "max_cardinality": 8,
+    "cardinality_mean": 4.5,
+    "split_alpha": 2.0,
+    "interaction_strength": 1.0,
+    "separation_scale": 0.65,
+    "root_scale": 0.8,
+    "reservoir_min": 0.03,
+    "reservoir_max": 0.12,
+    "feature_dim": 2
+  },
+  "corruption_config": {
+    "horizon": 1.0,
+    "switch_time": 0.5,
+    "split_rate": 0.0,
+    "gamma": 0.7,
+    "max_components": 20,
+    "split_beta": 2.0,
+    "separation_scale": 0.35
+  },
+  "run_config": {
+    "model_type": "birth_only",
+    "seed": 71,
+    "train_size": 4000,
+    "validation_size": 800,
+    "test_size": 1000,
+    "epochs": 30,
+    "batch_size": 64,
+    "learning_rate": 0.0002,
+    "weight_decay": 1e-05,
+    "gradient_clip": 5.0,
+    "samples": 1000,
+    "hidden_dim": 128,
+    "transformer_layers": 3,
+    "mixture_components": 6,
+    "validation_every": 1
+  },
+  "model_type": "birth_only",
+  "parameter_count": 786881,
+  "training_seconds": 159.61125640012324,
+  "best_validation_loss": 1.879844388961792,
+  "validation_path": {
+    "loss": 1.879844388961792,
+    "count_nll": 1.8846264362335206,
+    "birth_nll": -0.004782010316848755,
+    "merge_nll": 0.0,
+    "survival": 0.0
+  },
+  "test_path": {
+    "loss": 1.8582536821365356,
+    "count_nll": 1.861176752090454,
+    "birth_nll": -0.002923040270805359,
+    "merge_nll": 0.0,
+    "survival": 0.0
+  },
+  "merge_metrics": {
+    "not_applicable": true
+  },
+  "latent_genealogy_metrics": {
+    "not_applicable": true
+  },
+  "sample_metrics": {
+    "cardinality_tv": 0.04900000000000002,
+    "component_mass_w1": 0.0029964952251752214,
+    "pair_distance_w1": 0.036402678078824226,
+    "summary_mmd": 0.006731018814447154,
+    "summary_energy_distance": 0.01591711702363252,
+    "classifier_two_sample_accuracy": 0.535,
+    "mass_residual_mean": 0.0,
+    "mass_residual_max": 0.0,
+    "empty_sample_rate": 0.0,
+    "milliseconds_per_sample": 10.403742328286171,
+    "peak_gpu_memory_mb": 33.2822265625
+  }
+}

@@ -1,0 +1,30 @@
+.venv/
+.cache/
+.mplconfig/
+__pycache__/
+*.pyc
+.DS_Store
+
+# Downloaded datasets and generated model artifacts
+data/calochallenge/**/*.hdf5
+results/**/*.hdf5
+results/**/*.pt
+results/**/*.npz
+results/**/*.npy
+results/**/*.log
+results/**/*.pid
+
+# LaTeX build products (keep the source and rendered paper PDF)
+*.aux
+*.bbl
+*.blg
+*.fdb_latexmk
+*.fls
+*.log
+*.out
+*.synctex.gz
+
+results/cpu_extended_quick/
+results/gpu_synthetic_smoke/
+results/gpu_birth_only_smoke/
+results/gpu_diffusion_smoke*/

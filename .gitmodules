@@ -1,0 +1,6 @@
+[submodule "external/calochallenge-homepage"]
+	path = external/calochallenge-homepage
+	url = https://github.com/CaloChallenge/homepage.git
+[submodule "external/jump-diffusion"]
+	path = external/jump-diffusion
+	url = https://github.com/andrew-cr/jump-diffusion.git

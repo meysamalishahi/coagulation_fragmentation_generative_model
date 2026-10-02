@@ -1,0 +1,94 @@
+{
+  "environment": {
+    "python": "3.10.17",
+    "platform": "Linux-5.15.0-139-generic-x86_64-with-glibc2.31",
+    "torch": "2.7.0+cu126",
+    "cuda_available": true,
+    "cuda_version": "12.6",
+    "device": "cuda",
+    "device_name": "NVIDIA RTX A5000"
+  },
+  "synthetic_config": {
+    "min_cardinality": 2,
+    "max_cardinality": 10,
+    "cardinality_mean": 6.5,
+    "split_alpha": 2.0,
+    "interaction_strength": 1.0,
+    "separation_scale": 0.65,
+    "root_scale": 0.8,
+    "reservoir_min": 0.03,
+    "reservoir_max": 0.12,
+    "feature_dim": 2
+  },
+  "corruption_config": {
+    "horizon": 1.0,
+    "switch_time": 0.5,
+    "split_rate": 1.2,
+    "gamma": 0.7,
+    "max_components": 24,
+    "split_beta": 2.0,
+    "separation_scale": 0.35
+  },
+  "run_config": {
+    "model_type": "coagulation",
+    "seed": 11,
+    "train_size": 1500,
+    "validation_size": 300,
+    "test_size": 500,
+    "epochs": 15,
+    "batch_size": 64,
+    "learning_rate": 0.0002,
+    "weight_decay": 1e-05,
+    "gradient_clip": 5.0,
+    "samples": 500,
+    "hidden_dim": 64,
+    "transformer_layers": 2,
+    "mixture_components": 6,
+    "validation_every": 1
+  },
+  "model_type": "coagulation",
+  "parameter_count": 151237,
+  "training_seconds": 411.59156872611493,
+  "best_validation_loss": 4.951835257212321,
+  "validation_path": {
+    "loss": 4.931760368347168,
+    "count_nll": 3.0420105616251627,
+    "birth_nll": -7.039853477478028,
+    "merge_nll": 3.920257205963135,
+    "survival": 5.009345957438151
+  },
+  "test_path": {
+    "loss": 4.83857631111145,
+    "count_nll": 3.0484590854644775,
+    "birth_nll": -7.106578071594238,
+    "merge_nll": 3.870367805480957,
+    "survival": 5.0263271484375
+  },
+  "merge_metrics": {
+    "merge_events": 2551,
+    "merge_pair_accuracy": 0.17718541748333988,
+    "merge_target_probability": 0.08784625383616201,
+    "uniform_target_probability": 0.030267635472704373,
+    "candidate_recall": 1.0
+  },
+  "latent_genealogy_metrics": {
+    "sets_evaluated": 500,
+    "terminal_sibling_top_pair_accuracy": 0.404,
+    "terminal_sibling_probability": 0.2862310041170567,
+    "terminal_sibling_uniform_probability": 0.20703809523809583,
+    "terminal_sibling_candidate_recall": 1.0
+  },
+  "sample_metrics": {
+    "cardinality_tv": 0.15000000000000002,
+    "component_mass_w1": 0.015065957748184018,
+    "pair_distance_w1": 0.1339677075411098,
+    "summary_mmd": 0.02658669186224283,
+    "summary_energy_distance": 0.0369045574771838,
+    "classifier_two_sample_accuracy": 0.6025,
+    "mass_residual_mean": 0.0,
+    "mass_residual_max": 0.0,
+    "empty_sample_rate": 0.006,
+    "milliseconds_per_sample": 147.12781755812466,
+    "peak_gpu_memory_mb": 21.1708984375
+  }
+}

@@ -1,0 +1,9 @@
+cardinality,cardinality_label,reference_probability,generated_probability
+0,0,0.0,0.012
+1,1,0.0,0.074
+2,2,0.444,0.252
+3,3,0.294,0.296
+4,4,0.15,0.166
+5,5,0.078,0.128
+6,6,0.034,0.036
+7,>6,0.0,0.036

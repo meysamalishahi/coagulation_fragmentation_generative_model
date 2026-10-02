@@ -1,0 +1,76 @@
+{
+  "environment": {
+    "python": "3.10.17",
+    "torch": "2.7.0+cu126",
+    "device": "cuda",
+    "device_name": "NVIDIA RTX A5000"
+  },
+  "model_type": "cardinality_diffusion",
+  "objective_type": "ddpm_epsilon_mse_plus_count_nll",
+  "synthetic_config": {
+    "min_cardinality": 2,
+    "max_cardinality": 8,
+    "cardinality_mean": 4.5,
+    "split_alpha": 2.0,
+    "interaction_strength": 1.0,
+    "separation_scale": 0.65,
+    "root_scale": 0.8,
+    "reservoir_min": 0.03,
+    "reservoir_max": 0.12,
+    "feature_dim": 2
+  },
+  "diffusion_config": {
+    "feature_dim": 2,
+    "min_cardinality": 2,
+    "max_cardinality": 8,
+    "hidden_dim": 128,
+    "transformer_layers": 3,
+    "attention_heads": 4,
+    "time_embedding_dim": 32,
+    "diffusion_steps": 100,
+    "beta_min": 0.0001,
+    "beta_max": 0.02
+  },
+  "run_config": {
+    "output_dir": "/home/kwesi/Desktop/Meysam/Meysam/Condensation Generative Modles/results/gpu_campaign/paired/seed_11/cardinality_diffusion",
+    "seed": 11,
+    "train_size": 4000,
+    "validation_size": 800,
+    "test_size": 1000,
+    "epochs": 30,
+    "batch_size": 64,
+    "samples": 1000,
+    "hidden_dim": 128,
+    "transformer_layers": 3,
+    "diffusion_steps": 100,
+    "learning_rate": 0.0002,
+    "min_cardinality": 2,
+    "max_cardinality": 8,
+    "cardinality_mean": 4.5,
+    "split_alpha": 2.0,
+    "interaction_strength": 1.0,
+    "separation_scale": 0.65,
+    "device": "cuda"
+  },
+  "parameter_count": 633226,
+  "training_seconds": 28.834400442428887,
+  "best_validation_objective": 2.420847053527832,
+  "test_objective": {
+    "loss": 2.429480504989624,
+    "denoising_mse": 0.5393331758975982,
+    "count_nll": 1.8901473531723023
+  },
+  "sample_metrics": {
+    "cardinality_tv": 0.105,
+    "component_mass_w1": 0.015178431054965103,
+    "pair_distance_w1": 0.013146006654810385,
+    "summary_mmd": 0.012254922760725151,
+    "summary_energy_distance": 0.019209222919491342,
+    "classifier_two_sample_accuracy": 0.555,
+    "mass_residual_mean": 3.123912028968334e-08,
+    "mass_residual_max": 1.210719347000122e-07,
+    "empty_sample_rate": 0.0,
+    "milliseconds_per_sample": 0.2608958939090371,
+    "peak_gpu_memory_mb": 66.03759765625
+  }
+}

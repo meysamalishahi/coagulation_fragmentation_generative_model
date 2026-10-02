@@ -1,0 +1,120 @@
+{
+  "run_dir": "/home/kwesi/Desktop/Meysam/Meysam/Condensation Generative Modles/results/gpu_campaign/paired/seed_11/coagulation",
+  "selection_data": "validation_only",
+  "calibration_samples": 120,
+  "grid": [
+    {
+      "leaf_temperature": 0.7,
+      "merge_rate_scale": 0.8,
+      "validation_cardinality_tv": 0.16666666666666669,
+      "milliseconds_per_sample": 78.84168099456777
+    },
+    {
+      "leaf_temperature": 0.7,
+      "merge_rate_scale": 1.0,
+      "validation_cardinality_tv": 0.20000000000000004,
+      "milliseconds_per_sample": 77.74137010953079
+    },
+    {
+      "leaf_temperature": 0.7,
+      "merge_rate_scale": 1.2,
+      "validation_cardinality_tv": 0.2166666666666667,
+      "milliseconds_per_sample": 82.5873161976536
+    },
+    {
+      "leaf_temperature": 1.0,
+      "merge_rate_scale": 0.8,
+      "validation_cardinality_tv": 0.20833333333333334,
+      "milliseconds_per_sample": 96.37561472288023
+    },
+    {
+      "leaf_temperature": 1.0,
+      "merge_rate_scale": 1.0,
+      "validation_cardinality_tv": 0.09166666666666669,
+      "milliseconds_per_sample": 87.93085040524602
+    },
+    {
+      "leaf_temperature": 1.0,
+      "merge_rate_scale": 1.2,
+      "validation_cardinality_tv": 0.20833333333333331,
+      "milliseconds_per_sample": 86.24051918741316
+    },
+    {
+      "leaf_temperature": 1.3,
+      "merge_rate_scale": 0.8,
+      "validation_cardinality_tv": 0.21666666666666667,
+      "milliseconds_per_sample": 121.37577591153483
+    },
+    {
+      "leaf_temperature": 1.3,
+      "merge_rate_scale": 1.0,
+      "validation_cardinality_tv": 0.15833333333333335,
+      "milliseconds_per_sample": 108.02757537458092
+    },
+    {
+      "leaf_temperature": 1.3,
+      "merge_rate_scale": 1.2,
+      "validation_cardinality_tv": 0.12499999999999999,
+      "milliseconds_per_sample": 109.99870349963506
+    }
+  ],
+  "selected": {
+    "leaf_temperature": 1.0,
+    "merge_rate_scale": 1.0
+  },
+  "uncalibrated_test_metrics": {
+    "cardinality_tv": 0.074,
+    "component_mass_w1": 0.003477943811057445,
+    "pair_distance_w1": 0.028686725207571408,
+    "summary_mmd": 0.005779539236855591,
+    "summary_energy_distance": 0.0034303989326791573,
+    "classifier_two_sample_accuracy": 0.52125,
+    "mass_residual_mean": 0.0,
+    "mass_residual_max": 0.0,
+    "empty_sample_rate": 0.001,
+    "milliseconds_per_sample": 86.62478076480329,
+    "peak_gpu_memory_mb": 33.91748046875
+  },
+  "calibrated_test_metrics": {
+    "cardinality_tv": 0.07499999999999997,
+    "component_mass_w1": 0.004681962757684674,
+    "pair_distance_w1": 0.029236108999130317,
+    "summary_mmd": 0.0051113716232409345,
+    "summary_energy_distance": 0.0018067711180556056,
+    "classifier_two_sample_accuracy": 0.51375,
+    "mass_residual_mean": 0.0,
+    "mass_residual_max": 0.0,
+    "empty_sample_rate": 0.0,
+    "milliseconds_per_sample": 88.77271015290171,
+    "peak_gpu_memory_mb": 13.8388671875
+  },
+  "synthetic_config": {
+    "min_cardinality": 2,
+    "max_cardinality": 8,
+    "cardinality_mean": 4.5,
+    "split_alpha": 2.0,
+    "interaction_strength": 1.0,
+    "separation_scale": 0.65,
+    "root_scale": 0.8,
+    "reservoir_min": 0.03,
+    "reservoir_max": 0.12,
+    "feature_dim": 2
+  },
+  "run_config": {
+    "model_type": "coagulation",
+    "seed": 11,
+    "train_size": 4000,
+    "validation_size": 800,
+    "test_size": 1000,
+    "epochs": 30,
+    "batch_size": 64,
+    "learning_rate": 0.0002,
+    "weight_decay": 1e-05,
+    "gradient_clip": 5.0,
+    "samples": 1000,
+    "hidden_dim": 128,
+    "transformer_layers": 3,
+    "mixture_components": 6,
+    "validation_every": 1
+  }
+}

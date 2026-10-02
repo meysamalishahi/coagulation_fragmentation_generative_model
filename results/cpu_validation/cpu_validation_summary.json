@@ -1,0 +1,138 @@
+{
+  "all_checks_passed": true,
+  "checks": [
+    {
+      "detail": "split/merge and delete/birth inversion",
+      "metric": 5.551115123125783e-16,
+      "name": "event_maps_and_conservation",
+      "passed": true,
+      "seconds": 0.03454737504944205,
+      "tolerance": 2e-12
+    },
+    {
+      "detail": "flow conservation and inverse flow",
+      "metric": 3.725609571987861e-16,
+      "name": "closed_form_flow",
+      "passed": true,
+      "seconds": 0.007781667169183493,
+      "tolerance": 2e-12
+    },
+    {
+      "detail": "raw weights recovered after reservoir augmentation",
+      "metric": 2.220446049250313e-16,
+      "name": "normalized_encoder_decoder",
+      "passed": true,
+      "seconds": 0.007419208064675331,
+      "tolerance": 2e-12
+    },
+    {
+      "detail": "finite-difference determinant versus parent mass m",
+      "metric": 4.6467735446251003e-10,
+      "name": "split_jacobian",
+      "passed": true,
+      "seconds": 0.007029291708022356,
+      "tolerance": 2e-07
+    },
+    {
+      "detail": "finite-difference determinant versus M^n(1-xi)^(n-1)",
+      "metric": 4.046478313739246e-10,
+      "name": "dequantization_jacobian",
+      "passed": true,
+      "seconds": 0.00378266628831625,
+      "tolerance": 1e-06
+    },
+    {
+      "detail": "finite-difference determinant versus alpha^(n-1) f'(c)",
+      "metric": 1.4046755598439278e-09,
+      "name": "flow_jacobian",
+      "passed": true,
+      "seconds": 0.00362229160964489,
+      "tolerance": 1e-06
+    },
+    {
+      "detail": "independent Monte Carlo integrals; validates dy=m dx and reverse 1/m",
+      "metric": 0.0026825352492236883,
+      "name": "split_change_of_variables",
+      "passed": true,
+      "seconds": 0.5644091670401394,
+      "tolerance": 0.008
+    },
+    {
+      "detail": "flux equality and q R = -p G",
+      "metric": 2.220446049250313e-16,
+      "name": "finite_exact_time_reversal",
+      "passed": true,
+      "seconds": 0.15358137479051948,
+      "tolerance": 2e-10
+    },
+    {
+      "detail": "tabular marked-rate MLE versus analytical reverse rates",
+      "metric": 0.005411051564748159,
+      "name": "finite_reverse_rate_mle",
+      "passed": true,
+      "seconds": 0.466690540779382,
+      "tolerance": 0.012
+    },
+    {
+      "detail": "order-statistic means k S/(L+1)",
+      "metric": 0.000998101905545011,
+      "name": "uniform_birth_bridge",
+      "passed": true,
+      "seconds": 0.982300375122577,
+      "tolerance": 0.0025
+    },
+    {
+      "detail": "uniform-time Monte Carlo versus exact integral",
+      "metric": 0.00029121629563277907,
+      "name": "survival_integral_estimator",
+      "passed": true,
+      "seconds": 0.029993999749422073,
+      "tolerance": 0.0025
+    },
+    {
+      "detail": "mean exponential-event NLL versus analytic expectation",
+      "metric": 0.001188219418610914,
+      "name": "constant_rate_path_likelihood",
+      "passed": true,
+      "seconds": 0.16197583312168717,
+      "tolerance": 0.004
+    },
+    {
+      "detail": "accepted waiting-time mean versus Exp(rate)",
+      "metric": 0.002045105542949166,
+      "name": "constant_rate_thinning",
+      "passed": true,
+      "seconds": 0.08379791676998138,
+      "tolerance": 0.005
+    }
+  ],
+  "finite_state": {
+    "empty_probability_t_0.95": 0.7611525656985243,
+    "positive_reverse_edges": 23.0,
+    "state_count": 321.0,
+    "worst_flux_residual": 1.1102230246251565e-16,
+    "worst_reverse_derivative_residual": 2.220446049250313e-16,
+    "worst_reverse_row_sum": 0.0
+  },
+  "interpretation": {
+    "not_validated": "neural estimation, real-data sample quality, competitive baselines, scalability, or ICML-level empirical advantage",
+    "validated": "algebraic maps, conservation, coordinate Jacobians, Monte Carlo 1/m identity, finite-state flux reversal, and simple point-process identities"
+  },
+  "quick": false,
+  "seed": 20260930,
+  "synthetic_pair_diagnostic": {
+    "birth_only_covariance_error": 0.6625804981603858,
+    "birth_only_distance_median": 0.9639407014047735,
+    "birth_only_distance_w1": 0.8058129518474056,
+    "birth_only_pair_covariance": 0.3377318314123841,
+    "seconds": 0.06818479113280773,
+    "structured_covariance_error": 0.010474240697992299,
+    "structured_distance_median": 0.36697692603683396,
+    "structured_distance_w1": 0.0012316881438138214,
+    "structured_improves_covariance": true,
+    "structured_improves_distance_w1": true,
+    "structured_pair_covariance": 1.0107865702707621,
+    "truth_distance_median": 0.3668344845955586,
+    "truth_pair_covariance": 1.0003123295727698
+  }
+}

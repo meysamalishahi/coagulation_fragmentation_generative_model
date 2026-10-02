@@ -1,0 +1,133 @@
+{
+  "environment": {
+    "python": "3.10.17",
+    "torch": "2.7.0+cu126",
+    "device": "cuda",
+    "device_name": "NVIDIA RTX A5000"
+  },
+  "dataset": {
+    "name": "CaloChallenge Dataset 1 photons",
+    "train_file": "/home/kwesi/Desktop/Meysam/Meysam/Condensation Generative Modles/data/calochallenge/dataset_1_photons/dataset_1_photons_1.hdf5",
+    "geometry_file": "/home/kwesi/Desktop/Meysam/Meysam/Condensation Generative Modles/external/calochallenge-homepage/code/binning_dataset_1_photons.xml",
+    "layer_ids": [
+      0,
+      1,
+      2,
+      3,
+      12
+    ]
+  },
+  "run_config": {
+    "seed": 20261002,
+    "train_size": 8000,
+    "validation_size": 1000,
+    "iterations": 500,
+    "batch_size": 256,
+    "validation_batch_size": 1000,
+    "validation_every": 100,
+    "learning_rate": 0.0001,
+    "weight_decay": 0.1,
+    "hidden_dim": 676,
+    "hidden_layers": 5,
+    "mixture_components": 16
+  },
+  "model_config": {
+    "dimension": 5,
+    "hidden_dim": 676,
+    "hidden_layers": 5,
+    "mixture_components": 16,
+    "min_scale": 0.001
+  },
+  "energy_transform": {
+    "incident_log_mean": 9.446729637056356,
+    "incident_log_std": 2.4929145493474043,
+    "target_mean": [
+      -0.03725687649864483,
+      -5.5383302255741125,
+      -1.011718495636931,
+      7.869297701331666,
+      2.9248622530984276
+    ],
+    "target_std": [
+      0.1358033509523603,
+      3.731536792449208,
+      1.9793553849685894,
+      4.122701133868933,
+      5.460409046123804
+    ],
+    "layer_ids": [
+      0,
+      1,
+      2,
+      3,
+      12
+    ],
+    "epsilon": 1e-06,
+    "max_response": 4.0
+  },
+  "parameter_count": 1951789,
+  "reference_parameter_count": 1956225,
+  "parameter_difference_fraction": -0.002267632813198891,
+  "best_validation_nll": 0.538222074508667,
+  "training_seconds": 2.4557318799197674,
+  "sample_metrics": {
+    "response_w1": 0.010176832526922227,
+    "mean_layer_fraction_w1": 0.0090506656466602,
+    "reference_empty_rate": 0.0010000000474974513,
+    "generated_empty_rate": 0.0020000000949949026,
+    "reference_response_mean": 0.9646461606025696,
+    "generated_response_mean": 0.9648739695549011,
+    "layer_0_fraction_w1": 0.014327182737292776,
+    "layer_1_fraction_w1": 0.019469898464337804,
+    "layer_2_fraction_w1": 0.010208496806448693,
+    "layer_3_fraction_w1": 0.0004492046175664748,
+    "layer_4_fraction_w1": 0.0007985456076552579
+  },
+  "history": [
+    {
+      "step": 100,
+      "train_nll": 4.89383239865303,
+      "validation_nll": 1.8735450506210327,
+      "empty_nll": 0.011966908350586891,
+      "continuous_nll": 1.8634414672851562,
+      "learning_rate": 9.045084971874735e-05,
+      "training_seconds": 0.89139215182513
+    },
+    {
+      "step": 200,
+      "train_nll": 1.395391451716423,
+      "validation_nll": 1.4051530361175537,
+      "empty_nll": 0.008988525718450546,
+      "continuous_nll": 1.397562026977539,
+      "learning_rate": 6.545084971874737e-05,
+      "training_seconds": 1.2228255048394203
+    },
+    {
+      "step": 300,
+      "train_nll": 1.212249431014061,
+      "validation_nll": 1.2718874216079712,
+      "empty_nll": 0.008290672674775124,
+      "continuous_nll": 1.2648614645004272,
+      "learning_rate": 3.4549150281252616e-05,
+      "training_seconds": 1.6102845203131437
+    },
+    {
+      "step": 400,
+      "train_nll": 0.8747029250115156,
+      "validation_nll": 0.736422598361969,
+      "empty_nll": 0.008132348768413067,
+      "continuous_nll": 0.7290192246437073,
+      "learning_rate": 9.549150281252631e-06,
+      "training_seconds": 1.9965623104944825
+    },
+    {
+      "step": 500,
+      "train_nll": 0.4946194475144148,
+      "validation_nll": 0.538222074508667,
+      "empty_nll": 0.008154420182108879,
+      "continuous_nll": 0.5305982232093811,
+      "learning_rate": 0.0,
+      "training_seconds": 2.3913318384438753
+    }
+  ]
+}

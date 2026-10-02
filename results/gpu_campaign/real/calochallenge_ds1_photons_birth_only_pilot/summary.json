@@ -1,0 +1,89 @@
+{
+  "environment": {
+    "python": "3.10.17",
+    "torch": "2.7.0+cu126",
+    "device": "cuda",
+    "device_name": "NVIDIA RTX A5000"
+  },
+  "dataset": {
+    "name": "CaloChallenge Dataset 1 photons",
+    "doi": "10.5281/zenodo.8099322",
+    "train_file": "/home/kwesi/Desktop/Meysam/Meysam/Condensation Generative Modles/data/calochallenge/dataset_1_photons/dataset_1_photons_1.hdf5",
+    "test_file": "/home/kwesi/Desktop/Meysam/Meysam/Condensation Generative Modles/data/calochallenge/dataset_1_photons/dataset_1_photons_2.hdf5",
+    "geometry_file": "/home/kwesi/Desktop/Meysam/Meysam/Condensation Generative Modles/external/calochallenge-homepage/code/binning_dataset_1_photons.xml",
+    "voxel_count": 368,
+    "incident_log_mean": 9.44627851854008,
+    "incident_log_std": 2.5112744913116085,
+    "train_over_response_clipped": 21
+  },
+  "run_config": {
+    "model_type": "birth_only",
+    "seed": 20261001,
+    "train_size": 1000,
+    "validation_size": 200,
+    "test_size": 200,
+    "epochs": 8,
+    "batch_size": 32,
+    "samples": 200,
+    "data_components": 32,
+    "max_components": 48,
+    "relative_threshold": 0.01,
+    "hidden_dim": 128,
+    "transformer_layers": 3,
+    "mixture_components": 8,
+    "learning_rate": 0.0002,
+    "sample_batch_size": 8,
+    "sample_checkpoint_every": 25
+  },
+  "neural_config": {
+    "feature_dim": 3,
+    "max_components": 48,
+    "hidden_dim": 128,
+    "embedding_dim": 128,
+    "transformer_layers": 3,
+    "attention_heads": 4,
+    "mixture_components": 8,
+    "condition_dim": 1,
+    "horizon": 1.0,
+    "k_max": 4.0,
+    "sparse_k": null,
+    "min_scale": 0.001
+  },
+  "model_type": "birth_only",
+  "corruption_config": {
+    "horizon": 1.0,
+    "switch_time": 0.5,
+    "split_rate": 0.0,
+    "gamma": 0.8,
+    "max_components": 48,
+    "split_beta": 2.0,
+    "separation_scale": 0.35
+  },
+  "parameter_count": 794875,
+  "training_seconds": 62.243993057869375,
+  "best_validation_nll": -211.46997680664063,
+  "test_path": {
+    "loss": -207.66376586914063,
+    "count_nll": 3.707268362045288,
+    "birth_nll": -211.37103576660155,
+    "merge_nll": 0.0,
+    "survival": 0.0
+  },
+  "sample_metrics": {
+    "cardinality_tv": 0.535,
+    "retained_response_w1": 0.3761435900188508,
+    "longitudinal_centroid_w1": 0.18142942220281716,
+    "transverse_centroid_x_w1": 0.15368233297176428,
+    "transverse_centroid_y_w1": 0.11135858272361247,
+    "spatial_spread_w1": 0.3993472824809359,
+    "summary_mmd": 0.4910238013196522,
+    "summary_energy_distance": 2.109835321278838,
+    "classifier_two_sample_accuracy": 1.0,
+    "coordinate_out_of_geometry_fraction": 0.06108240022968705,
+    "mass_residual_mean": 2.220446049250313e-18,
+    "mass_residual_max": 1.1102230246251565e-16,
+    "empty_sample_rate": 0.03,
+    "milliseconds_per_sample": 20.124411759898067,
+    "peak_gpu_memory_mb": 33.42578125
+  }
+}

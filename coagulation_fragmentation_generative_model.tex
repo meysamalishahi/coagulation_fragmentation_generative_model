@@ -1,0 +1,2761 @@
+\documentclass[10pt]{article}
+
+\usepackage[margin=1in]{geometry}
+\usepackage{amsmath,amssymb,amsthm,mathtools,bm}
+\usepackage{booktabs,array}
+\usepackage{microtype}
+\usepackage{xcolor}
+\usepackage{enumitem}
+\usepackage{hyperref}
+\usepackage{url}
+
+\hypersetup{
+  colorlinks=true,
+  linkcolor=blue!55!black,
+  citecolor=green!45!black,
+  urlcolor=blue!65!black
+}
+
+\allowdisplaybreaks
+\setlist[itemize]{leftmargin=*,topsep=3pt,itemsep=2pt}
+\setlist[enumerate]{leftmargin=*,topsep=3pt,itemsep=2pt}
+
+\newtheorem{theorem}{Theorem}[section]
+\newtheorem{proposition}[theorem]{Proposition}
+\newtheorem{lemma}[theorem]{Lemma}
+\newtheorem{corollary}[theorem]{Corollary}
+\newtheorem{assumption}[theorem]{Assumption}
+\theoremstyle{definition}
+\newtheorem{definition}[theorem]{Definition}
+\newtheorem{example}[theorem]{Example}
+\theoremstyle{remark}
+\newtheorem{remark}[theorem]{Remark}
+
+\newcommand{\R}{\mathbb{R}}
+\newcommand{\N}{\mathbb{N}}
+\newcommand{\E}{\mathbb{E}}
+\newcommand{\Pp}{\mathbb{P}}
+\newcommand{\KL}{\mathrm{KL}}
+\newcommand{\TV}{\mathrm{TV}}
+\newcommand{\dd}{\,\mathrm{d}}
+\newcommand{\ind}{\mathbf{1}}
+\newcommand{\emptyconfig}{\varnothing_M}
+\newcommand{\state}{\mathsf{X}}
+\newcommand{\pdata}{P_{\mathrm{data}}}
+\newcommand{\splitmap}{\mathcal{S}}
+\newcommand{\mergemap}{\mathcal{C}}
+\newcommand{\deathmap}{\mathcal{D}}
+\newcommand{\birthmap}{\mathcal{B}}
+
+\newenvironment{algorithmblock}[1]
+{\par\medskip\noindent\begin{minipage}{\linewidth}\hrule\medskip
+ \noindent\textbf{#1}\par\smallskip\small}
+{\par\medskip\hrule\end{minipage}\par\medskip}
+
+\title{\textbf{Mass-Conserving Coagulation--Fragmentation Generative Models}\\
+Finite-Horizon Time Reversal on Variable-Size Weighted Sets}
+\author{Anonymous authors}
+\date{Draft: theory and algorithms complete; experiments not yet run}
+
+\begin{document}
+
+\maketitle
+
+\begin{abstract}
+Many data objects are unordered collections with a variable number of components and a meaningful positive additive quantity, such as mass, area, energy, or probability weight.  Standard diffusion models usually keep the number of components fixed, while a prominent trans-dimensional alternative removes and inserts one component at a time without an additive pair-merge constraint.  We introduce a different construction based on conservative binary fragmentation and coagulation.  The data-to-reference process first fragments components and moves component mass into an explicit reservoir.  It then removes every remaining component, so that the terminal state is exactly an all-reservoir state.  The finite-horizon reverse process starts from this simple state and performs nucleation, growth, and pairwise coagulation.
+
+The paper makes the construction precise on an unordered, variable-dimensional state space.  We define compatible reference measures, conservative split and merge maps, and a nonnegative reservoir flow.  We derive the reverse jump kernel from probability flux, including the mass Jacobian and the cancellation induced by a consistent unordered-pair convention.  We then specialize a path-space evidence lower bound to this conservative marked-event process.  Its trainable part is the negative log likelihood of reversed forward trajectories under a leaf-count, marked-event model.  This gives a simple simulation-based learning algorithm that does not require evaluating the unknown marginal density ratio appearing in the exact reverse rates.  We prove terminal absorption, non-explosion, exact mass conservation, permutation invariance, Fisher consistency under stated model-class assumptions, and an endpoint error bound.  We also give complete forward-simulation, training, and reverse-sampling algorithms.  An optional extension replaces uniform evaporation with a spatial control field motivated by clearing a fogged mirror one region at a time.  The experimental protocol is specified, but no experimental results are reported in this draft.
+\end{abstract}
+
+\section{Introduction}
+
+A set-valued observation can be written informally as
+\begin{equation}
+  X=\left\{(m_i,z_i)\right\}_{i=1}^{N},
+  \qquad m_i>0,\quad z_i\in\R^q,
+  \label{eq:intro-set}
+\end{equation}
+where the braces are understood as an unordered multiset, the order of the
+elements has no meaning, and the cardinality $N$ may change from one example
+to another.  The scalar $m_i$ is an additive quantity.  Depending on the application, it may represent physical mass, energy, area, intensity, or a normalized weight.  The vector $z_i$ stores position and other continuous features.
+
+We study generative models for such observations under the exact constraint
+\begin{equation}
+  v+\sum_{i=1}^{N}m_i=M.
+  \label{eq:mass-constraint-intro}
+\end{equation}
+Here $M>0$ is fixed or supplied as conditioning information, and $v\geq 0$ is an uncondensed reservoir.  Introducing $v$ is important.  It lets a component grow or evaporate without violating the additive constraint.
+
+The physical picture is condensation, but the method is not obtained by replacing a Gaussian noise schedule with the Hertz--Knudsen equation.  The useful structure is instead the change in topology:
+\[
+\text{reservoir}
+\longrightarrow \text{nucleation}
+\longrightarrow \text{growth}
+\longrightarrow \text{pairwise coagulation}
+\longrightarrow \text{sample}.
+\]
+Training uses the opposite direction.  A prescribed forward process fragments data components, transfers their mass to the reservoir, and finally deletes them.  The learned model follows the time-reversed trajectories.
+
+The motivating mirror observation also contains a second idea.  A hair dryer
+does not clear the whole mirror uniformly: it acts on one small region, the
+user observes what remains covered, and then moves the dryer.  Section~\ref{sec:local-control}
+turns this observation into an optional spatially controlled evaporation
+field.  The base model remains the uniform-control special case.
+
+This paper has five main contributions.
+\begin{enumerate}
+  \item We define a conservative fragmentation--evaporation process on finite unordered weighted configurations.  A two-stage schedule makes the all-reservoir terminal state exact rather than approximate.
+  \item We specialize finite-horizon Markov-process reversal to this state
+  space.  The resulting reverse events are nucleation and pairwise
+  coagulation.  The coordinate derivation handles both the mass-dependent
+  Jacobian and unordered-pair counting.
+  \item We specialize a path-space evidence lower bound to the conservative
+  marked-event process and obtain a tractable point-process loss.  Forward
+  paths provide supervised reverse events, while a survival integral trains
+  merge timing and stopping.
+  \item We give implementable neural parameterizations and event-driven algorithms with exact conservation, positivity, permutation invariance, and explicit non-explosion conditions.
+  \item We formulate a locally controlled evaporation extension, prove that
+  it remains conservative and positive, and explain its conditional reverse,
+  flow Jacobian, feedback policy, and implementation.
+\end{enumerate}
+
+The contribution is deliberately narrower than ``a condensation diffusion model.''  Variable-dimensional generation and general jump-process time reversal already exist.  Our focus is the complete conservative one-to-two/two-to-one construction on unordered weighted sets.
+
+\section{Related work}
+
+\paragraph{Corruption and reversal.}
+Diffusion models learn to reverse a prescribed corruption process
+\cite{sohldickstein2015deep,ho2020denoising,song2021score}.  Their connection to nonequilibrium thermodynamics is therefore foundational rather than new.  Cold Diffusion showed that useful models can invert degradations other than Gaussian noising \cite{bansal2023cold}.  Consequently, calling a degradation ``evaporation'' is not by itself a methodological contribution.
+
+\paragraph{Trans-dimensional generation.}
+The closest generative framework is the Jump Diffusion Model of
+Campbell et al.\ \cite{campbell2023transdimensional}.  It deletes individual components in the forward direction and learns state-conditioned single-component insertion in reverse, together with a trans-dimensional reversal formula and an evidence lower bound.  Learning to Jump uses thinning and thickening for latent counts \cite{chen2023learning}.  The 2026 preprint Existence-Field Diffusion instead represents variable cardinality by continuous existence variables \cite{pan2026existence}.  We do not claim that variable-dimensional generation is new.  Our distinction is a conservative binary split whose reverse must select and merge an interacting pair.
+
+\paragraph{Structured expansion and branching.}
+Iterative Local Expansion reverses graph coarsening by repeatedly splitting coarse nodes and refining local structure \cite{bergmeister2024efficient}.  The 2026 preprint Hierarchical Discrete Flow Matching also uses coarse-to-fine graph expansion \cite{boget2026hierarchical}.  In particle physics, JUNIPR generates particle sets through conservation-aware binary branchings \cite{andreassen2019junipr}.  These papers show that structured splitting is not itself new.  In our construction, the genealogy is sampled by the prescribed corruption rather than fixed by a preprocessing-induced clustering tree.
+
+Dimension-changing maps and their Jacobians also have a long history in
+reversible-jump Markov chain Monte Carlo \cite{green1995reversible}.  Unlike
+that stationary MCMC setting, we study a learned finite-horizon reversal.
+
+\paragraph{Coagulation, fragmentation, and reversal.}
+Coagulation--fragmentation processes have a large mathematical literature
+\cite{aldous1999deterministic,norris1999smoluchowski,bertoin2006random}.  General time-reversal results also exist for diffusions and Markov processes with jumps
+\cite{anderson1982reverse,conforti2022time}.  We therefore do not present the probability-flux identity as a new general theorem.  The technical work is its specialization to conservative unordered configurations, including compatible measures, event coordinates, counting factors, a trainable objective, and a practical sampler.
+
+\section{State space and notation}
+\label{sec:state}
+
+\subsection{Weighted configurations}
+
+Fix a total mass $M>0$, a feature dimension $q\geq 1$, and a finite
+cardinality cap $N_{\max}\geq1$.  The feature space is
+$\mathcal Z=\R^q$, equipped with its Borel sets and $q$-dimensional
+Lebesgue measure $\lambda_q$.  We use the shorthand
+\begin{equation}
+  \lambda_q^{\otimes n}(\dd(z_1,\ldots,z_n))
+  \equiv\dd z_{1:n}
+  :=\prod_{i=1}^n\lambda_q(\dd z_i).
+  \label{eq:feature-reference-measure}
+\end{equation}
+Thus every density in this paper that contains $\dd z_{1:n}$ is a density
+for continuous features relative to product Lebesgue measure.  Discrete or
+mixed features require a different product reference measure and are not
+covered by the displayed coordinate formulas.
+All state spaces and reference measures below are conditional on the chosen
+$M$; this dependence is suppressed in the notation $\state_n$ and $\mu_n$.
+
+A state with $n$ components is
+\begin{equation}
+  X=\left(v;\{(m_i,z_i)\}_{i=1}^{n}\right),
+  \qquad
+  v\geq 0,\quad m_i>0,\quad z_i\in\R^q,
+  \qquad v+\sum_{i=1}^{n}m_i=M.
+  \label{eq:state}
+\end{equation}
+The braces in \eqref{eq:state} denote an unordered multiset, not an ordinary
+set: identical pairs may occur with multiplicity.  Formally, a state is an
+equivalence class of labeled tuples under permutations of the $n$ indices.
+Two states are equal when one can be obtained from the other by such a
+permutation.  We write $N(X)=n$ and
+\begin{equation}
+  \mathcal{M}(X)=v+\sum_{i=1}^{N(X)}m_i.
+\end{equation}
+The all-reservoir state is
+\begin{equation}
+  \emptyconfig=(M;\varnothing).
+\end{equation}
+
+It is sometimes useful to view the components as the finite measure
+\begin{equation}
+  \eta_X=\sum_{i=1}^{N(X)}m_i\delta_{z_i}.
+  \label{eq:finite-measure}
+\end{equation}
+Then $\eta_X(\mathcal Z)=M-v$, and relabeling the components does not change
+$\eta_X$.  The symbol $\eta_X$ describes one state; it is not the reference
+measure used to integrate over all states.  If two components have exactly
+the same feature $z$, $\eta_X$ combines their masses and no longer records
+their multiplicity.  The unordered multiset in \eqref{eq:state} is therefore
+the primary representation.  Under the continuous feature densities used
+below, exact feature collisions have measure zero.
+
+Let $\state_n$ be the space of states with $n$ components and let
+\begin{equation}
+  \state=\bigsqcup_{n=0}^{N_{\max}}\state_n
+  \label{eq:disjoint-union}
+\end{equation}
+be their disjoint union.  For the finite-horizon process introduced in
+Section~\ref{sec:forward}, $t\in[0,T]$ denotes forward time and
+$X_t\in\state$ is the random state at time $t$.  Set
+$N_t=N(X_t)$.  On the event $\{N_t=n\}$, we have $X_t\in\state_n$.
+The process $N_t$ is piecewise constant and changes only at a split or
+deletion event in forward time, or at a birth or merge event in reverse
+time.  The cap is part of the model: a forward split is
+disabled when $N(X)=N_{\max}$.  It prevents an artificial explosion of
+ever smaller fragments and makes the reverse leaf budget finite.  A large
+$N_{\max}$ has no practical effect when data and simulated paths remain far
+below it.
+
+\paragraph{Data law, corruption law, and model law.}
+These three laws have different roles.  The raw data are sampled from an
+unknown law on unordered weighted sets; we do not assume that nature
+generated them by fragmentation.  The forward fragmentation--evaporation
+process is a user-chosen conditional corruption law used to construct
+training histories.  The learned reverse process is the generative model:
+it samples a leaf budget, birth times and marks, deterministic growth, and
+merge events, thereby inducing a joint endpoint law for masses and
+features.  In particular, there is no separate uniform law for $z_{1:n}$,
+and no independence among components, masses, and features is assumed.
+
+\paragraph{Reservoir dequantization.}
+Suppose a nonempty raw observation has normalized positive weights
+\begin{equation}
+  w=(w_1,\ldots,w_n)\in\Delta_{n-1}^{\circ}
+  :=\left\{w\in(0,1)^n:\sum_{i=1}^n w_i=1\right\}.
+  \label{eq:open-simplex}
+\end{equation}
+Only $w_{1:n-1}$ are free, because
+$w_n=1-\sum_{i<n}w_i$.  We assume the raw weights have a density in these
+$n-1$ simplex coordinates and that the features have a density relative to
+\eqref{eq:feature-reference-measure}.  The corresponding unordered raw
+reference measure is
+\begin{equation}
+  \nu_n^{\mathrm{raw}}(\dd w\,\dd z)
+  =\frac{1}{n!}\ind\{w\in\Delta_{n-1}^{\circ}\}
+   \dd w_{1:n-1}\,\dd z_{1:n}.
+  \label{eq:raw-reference-measure}
+\end{equation}
+The displayed coordinates use any labeled representative, with $w_n$
+eliminated.  Permuting the representative only changes to another simplex
+chart with absolute Jacobian one, and the factor $1/n!$ makes the resulting
+unordered density label-independent.  The case $n=1$ has no free $w$
+coordinate; its simplex is a single point.  The empty outcome has no
+normalized weight vector and is handled separately in $\state_0$.
+
+A fixed reservoir fraction $\xi_0$ would give
+$\sum_i m_i=M(1-\xi_0)$.  The mass vector would therefore lie on an
+$(n-1)$-dimensional hyperplane inside the $n$-dimensional mass domain.  That
+hyperplane has zero $\dd m_{1:n}$ measure, so the augmented data law would
+be singular relative to the state reference measure defined below.  A
+continuous random reservoir fraction supplies the missing radial dimension.
+Specifically, draw
+\begin{equation}
+  \xi\sim q_\epsilon,
+  \qquad
+  v=\xi M,
+  \qquad
+  m_i=(1-\xi)Mw_i,
+  \label{eq:reservoir-dequantization}
+\end{equation}
+where $q_\epsilon$ is a positive smooth density, relative to $\dd\xi$, on
+$I_\epsilon=[\epsilon_{\min},\epsilon_{\max}]\subset(0,1)$.  In this paper
+$q_\epsilon$ is fixed and independent of $(w,z)$; a data-dependent
+dequantization density could be used if its conditional log density were
+included in the bound.  The resulting state has $v>0$ and
+$\sum_i m_i<M$, and its law can have a full-dimensional density.  The
+dequantization density and its Jacobian must be included when a numerical
+data-likelihood bound is reported.  In
+coordinates $(w_1,\ldots,w_{n-1},\xi)\mapsto(m_1,\ldots,m_n)$, with
+$w_n=1-\sum_{i<n}w_i$, the absolute Jacobian determinant (see
+Appendix~\ref{app:dequantization-derivation}) is
+\begin{equation}
+  M^n(1-\xi)^{n-1}.
+  \label{eq:dequantization-jacobian}
+\end{equation}
+At the output, no auxiliary $\xi$ needs to be stored.  For a nonempty state,
+let $c=\sum_jm_j=M-v>0$ and decode
+\begin{equation}
+  \widehat w_i=\frac{m_i}{c}=\frac{m_i}{\sum_jm_j}.
+  \label{eq:normalized-decoder}
+\end{equation}
+If we define the state-implied fraction $\widehat\xi=v/M$, then
+$c=M(1-\widehat\xi)$, so this is also
+$\widehat w_i=m_i/[M(1-\widehat\xi)]$.  The empty state is a separate
+discrete outcome.  If an application observes a genuine reservoir, no
+augmentation or normalization decoder is needed provided that its joint law
+is supported on $v>0$ and is dominated by the interior reference measure
+below.  An atom at $v=0$ requires an additional boundary reference measure
+or an analogous dequantization.
+
+\begin{proposition}[The normalized encoder and decoder agree]
+\label{prop:encode-decode}
+For every nonempty state, the numbers in
+\eqref{eq:normalized-decoder} are positive and sum to one.  If a raw
+normalized set is encoded by \eqref{eq:reservoir-dequantization}, decoding
+it recovers its original weights exactly.  Conversely, decoding any
+nonempty state and re-encoding it with $\widehat\xi=v/M$ recovers all of its
+masses and its reservoir; the features are copied unchanged in both maps.
+\end{proposition}
+
+\begin{proof}
+Because every $m_i>0$ and $c=\sum_jm_j>0$, each $\widehat w_i>0$, and
+$\sum_i\widehat w_i=c/c=1$.  For an encoded datum,
+$c=\sum_iM(1-\xi)w_i=M(1-\xi)$, hence
+$m_i/c=w_i$.  Conversely, with $\widehat\xi=v/M$,
+\[
+  M(1-\widehat\xi)\widehat w_i
+  =(M-v)\frac{m_i}{M-v}=m_i,
+  \qquad M\widehat\xi=v.
+\]
+Thus the two maps are inverses on every nonempty stratum.
+\end{proof}
+
+For completeness, the raw normalized-data likelihood obeys the standard
+dequantization bound
+\begin{align}
+  \log p_\theta^{\mathrm{raw}}(w_{1:n-1},z_{1:n})
+  \geq \E_{\xi\sim q_\epsilon}\big[&
+    \log p_{\theta,n}(X(\xi))
+    +n\log M+(n-1)\log(1-\xi)
+    -\log q_\epsilon(\xi)\big].
+  \label{eq:dequantization-bound}
+\end{align}
+Here $p_\theta^{\mathrm{raw}}$ is a density relative to
+$\nu_n^{\mathrm{raw}}$, whereas $p_\theta$ is a state density relative to
+the measure below.  More explicitly, if $P_\theta$ is the endpoint law of
+the learned reverse process, then $p_{\theta,n}$ is its density on
+$\state_n$.  The bound follows by marginalizing the state-implied
+reservoir fraction over $(0,1)$, restricting the integral to
+$I_\epsilon$, inserting $q_\epsilon/q_\epsilon$, and applying Jensen's
+inequality.  The path ELBO
+below can be substituted for $\log p_{\theta,n}(X(\xi))$ to obtain one combined
+lower bound.
+Appendix~\ref{app:dequantization-derivation} gives the complete derivations
+of \eqref{eq:dequantization-jacobian} and
+\eqref{eq:dequantization-bound}.
+Throughout the theory below, $\pdata$ denotes the law of this augmented
+state $X$ (or the directly observed state when a reservoir is available).
+
+\subsection{Reference measure}
+
+An unordered density requires a counting convention.  Let
+$\mathfrak q_n$ map a labeled coordinate tuple $(m_{1:n},z_{1:n})$ to its unordered
+state, with $v=M-\sum_i m_i$.  We define $\mu_n$ by requiring that, for
+every nonnegative measurable function $f$, where
+$\dd m_{1:n}:=\prod_{i=1}^n\dd m_i$ is $n$-dimensional Lebesgue volume,
+\begin{align}
+  \int_{\state_n}f(X)\mu_n(\dd X)
+  =\frac{1}{n!}\int
+  &f\!\left(\mathfrak q_n(m_{1:n},z_{1:n})\right)
+  \ind\!\left\{m_i>0,\ \sum_{i=1}^{n}m_i<M\right\}
+  \dd m_{1:n}\,\dd z_{1:n}.
+  \label{eq:reference-measure}
+\end{align}
+We use the corresponding shorthand
+$\mu_n(\dd X)=n!^{-1}\ind\{m_i>0,\sum_i m_i<M\}
+\dd m_{1:n}\dd z_{1:n}$.
+
+For fixed $M$, the mass-coordinate domain is the open scaled simplex
+\begin{equation}
+  D_n(M)=\left\{m\in(0,\infty)^n:\sum_{i=1}^n m_i<M\right\}.
+  \label{eq:mass-domain}
+\end{equation}
+Each individual mass lies in $(0,M)$, but the joint domain is not the full
+box $(0,M)^n$ because the masses share the same budget.  Lebesgue volume on
+$D_n(M)$ is a reference measure, not a uniform probability distribution.
+
+The condition $m_i>0$ repeats the definition of $\state_n$ in ambient
+Euclidean coordinates so that the domain of integration is explicit.  A
+zero-mass element is absent and belongs to a lower-cardinality stratum.  The
+strict inequality selects the interior $v>0$.  We keep the boundary $v=0$
+in the state space for event-map and flow statements, but it has zero
+$\mu_n$ measure; a law with an atom on that boundary would need an additional
+singular measure component.
+
+The factor $1/n!$ is needed because a generic unordered configuration has
+$n!$ labeled coordinate representations.  Integrating a symmetric function
+over all labeled coordinates without this factor would count the same state
+$n!$ times.  The state-specific finite measure $\eta_X$ in
+\eqref{eq:finite-measure} does not solve this counting problem: it represents
+one configuration, whereas $\mu_n$ defines volume across all configurations.
+For example, when $n=2$, the labeled tuples
+$((m_1,z_1),(m_2,z_2))$ and
+$((m_2,z_2),(m_1,z_1))$ describe the same unordered state.  The factor
+$1/2!$ counts that state once.  Equivalently, one could integrate only over
+one canonically ordered chamber and omit the factorial.
+Feature collisions can reduce the number of distinct labelings, but those
+collisions form a null set under product Lebesgue measure.  We write
+\begin{equation}
+  \mu=\sum_{n=0}^{N_{\max}}\mu_n,
+\end{equation}
+with $\mu_0$ a unit point mass at $\emptyconfig$.  For later use, write
+$P_t=\mathcal L(X_t)$ for the law of $X_t$.  Whenever the restriction of
+$P_t$ to $\state_n$ is absolutely continuous with respect to $\mu_n$, define
+the stratum density by
+\begin{equation}
+  p_{t,n}
+  =\frac{\dd(P_t|_{\state_n})}{\dd\mu_n},
+  \qquad
+  P_t(\dd X)=p_{t,n}(X)\mu_n(\dd X),
+  \quad X\in\state_n.
+  \label{eq:stratum-density}
+\end{equation}
+It integrates to the probability of the corresponding cardinality,
+\begin{equation}
+  \int_{\state_n}p_{t,n}(X)\mu_n(\dd X)
+  =P_t(\state_n)=\Pp(N_t=n),
+  \label{eq:stratum-density-mass}
+\end{equation}
+and therefore need not integrate to one.
+
+The element $\dd z_{1:n}$ in \eqref{eq:reference-measure} is a volume
+element, not a probability distribution.  A probability law is obtained
+only after multiplying $\mu_n$ by the joint density $p_{t,n}$; that density
+may couple all masses and features.  During reservoir dequantization the
+observed $z_{1:n}$ are copied unchanged, so their Jacobian block is the
+identity.  We integrate out the auxiliary $\xi$ in the raw likelihood, but
+we do not integrate out $z_{1:n}$ because the features are observed.  A
+weights-only marginal would additionally integrate over $\mathcal Z^n$
+with respect to $\lambda_q^{\otimes n}$.
+
+For any measurable $A\subseteq\state$, the complete law is reconstructed
+from its stratum densities as
+\begin{equation}
+  P_t(A)=\sum_{n=0}^{N_{\max}}
+  \int_{A\cap\state_n}p_{t,n}(X)\mu_n(\dd X).
+  \label{eq:full-law-from-strata}
+\end{equation}
+Thus $\mu_n$ is a sigma-finite coordinate-volume measure, not a uniform
+probability law on configurations.
+
+The $1/n!$ convention is not cosmetic.  It determines the factors in the birth and merge rates derived in Section~\ref{sec:reverse}.
+
+\subsection{A notation table}
+
+\begin{center}
+\small
+\begin{tabular}{>{\raggedright\arraybackslash}p{0.20\linewidth}p{0.70\linewidth}}
+\toprule
+Symbol & Meaning \\
+\midrule
+$M$ & conserved total mass, fixed or conditioned upon \\
+$\mathcal Z,\lambda_q$ & continuous feature space $\R^q$ and its Lebesgue reference measure \\
+$N_{\max}$ & maximum allowed number of components \\
+$v$ & mass in the reservoir \\
+$(m_i,z_i)$ & mass and continuous feature of component $i$ \\
+$N(X),N_t$ & number of components in state $X$, and $N(X_t)$ at time $t$ \\
+$\eta_X$ & finite measure representing one weighted configuration \\
+$\state_n,\state$ & $n$-component state space and its disjoint union \\
+$\mu_n$ & unordered reference measure with factor $1/n!$ \\
+$\nu_n^{\mathrm{raw}}$ & reference measure for unordered normalized raw data \\
+$\Delta_{n-1}^{\circ}$ & open simplex of $n$ positive normalized weights \\
+$q_\epsilon$ & fixed density of the auxiliary reservoir fraction $\xi$ \\
+$P_t,p_{t,n}$ & forward marginal law and its density on $\state_n$ \\
+$P_\theta,p_{\theta,n}$ & learned endpoint law and its density on $\state_n$ \\
+$y$ & optional conditioning information \\
+$T,\tau,S_N$ & terminal time, switch time, and nucleation duration $S_N=T-\tau$ \\
+$\beta,\gamma,\delta$ & prescribed split, reservoir-flow, and deletion schedules \\
+$\kappa_t$ & prescribed normalized split-mark density \\
+$\splitmap_i,\mergemap_{ab}$ & split of component $i$ and merge of pair $a,b$ \\
+$\deathmap_i,\birthmap_{m,z}$ & deletion and insertion maps \\
+$Q_t,\overline Q_s$ & forward and reverse jump kernels \\
+$\nu_X,\varrho$ & reference measures for forward histories and raw reverse records \\
+$Y_s,\widetilde X_s$ & exact reversed state and reversed training path at reverse time $s$ \\
+$L,\Pi_\theta$ & Stage-N leaf budget and its learned probability mass function \\
+$A_\theta^{(\omega)},A_\theta^{(m)}$ & birth-mark densities in mass-fraction and absolute-mass coordinates \\
+$B_L$ & fixed conditional birth hazard determined by $L$ \\
+$\Lambda_\theta^C$ & learned total coagulation rate \\
+$K_\theta(a,b\mid X,s)$ & learned merge intensity for unordered pair $a<b$ \\
+$a_t(x)$ & optional control field at spatial coordinate $x=\operatorname{pos}(z)$ \\
+$\lambda_i(t,X,a_t)$ & controlled evaporation rate of component $i$ \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+\section{Conservative event maps}
+\label{sec:event-maps}
+
+This section defines the four operations used by the model.  Each operation preserves $\mathcal M(X)=M$ exactly.
+
+\subsection{Mass exchange with the reservoir}
+
+Between jumps, component features stay fixed and masses obey
+\begin{align}
+  \frac{\dd m_i}{\dd t}
+  &=-\gamma(t)\frac{v}{M}m_i,
+  \label{eq:forward-flow-mi}\\
+  \frac{\dd v}{\dd t}
+  &=\gamma(t)\frac{v}{M}\sum_{i=1}^{N(X)}m_i,
+  \label{eq:forward-flow-v}
+\end{align}
+where $\gamma(t)\geq0$ is prescribed.  This is the forward evaporation flow.  It is deliberately simple: it transfers mass to the reservoir without changing relative component masses.
+
+Let $c=M-v=\sum_i m_i$ and $r=c/(M-c)=c/v$.  On an interval with no jump,
+\begin{equation}
+  r(t)=r(t_0)\exp\!\left(-\int_{t_0}^{t}\gamma(u)\dd u\right),
+  \qquad
+  c(t)=M\frac{r(t)}{1+r(t)},
+  \label{eq:closed-form-flow}
+\end{equation}
+and every $m_i$ is multiplied by $c(t)/c(t_0)$.  Thus the flow is available in closed form.
+To verify the formula, sum \eqref{eq:forward-flow-mi} to obtain
+\begin{equation}
+  \frac{\dd c}{\dd t}=-\gamma(t)\frac{c(M-c)}{M}.
+\end{equation}
+For $0<c<M$, differentiating
+$\log r=\log c-\log(M-c)$ gives
+$\dd\log r/\dd t=-\gamma(t)$, which integrates to
+\eqref{eq:closed-form-flow}.  The two boundary cases are fixed points:
+$c=0$ is the empty state and $v=M$, while $v=0$ means $c=M$.  The odds
+$r$ need not be evaluated at either boundary.
+
+Running time backward changes the signs:
+\begin{align}
+  \frac{\dd m_i}{\dd s}
+  &=+\gamma(T-s)\frac{v}{M}m_i,
+  &
+  \frac{\dd v}{\dd s}
+  &=-\gamma(T-s)\frac{v}{M}\sum_i m_i.
+  \label{eq:reverse-growth-flow}
+\end{align}
+Equation~\eqref{eq:reverse-growth-flow} is the growth stage of generation.  Because its vector field vanishes at $m_i=0$ and $v=0$, neither component mass nor reservoir mass can cross below zero.
+
+\subsection{Binary fragmentation and coagulation}
+
+Choose a component $(m,z)$, a fraction $\rho\in(0,1)$, and a displacement $u\in\R^q\setminus\{0\}$.  Define
+\begin{align}
+  m_a&=\rho m,
+  &z_a&=z-(1-\rho)u,
+  \label{eq:split-a}\\
+  m_b&=(1-\rho)m,
+  &z_b&=z+\rho u.
+  \label{eq:split-b}
+\end{align}
+The split map $\splitmap_i(X;\rho,u)$ replaces component $i$ by these two children.  It preserves both mass and the mass-weighted feature centroid:
+\begin{equation}
+  m_a+m_b=m,
+  \qquad
+  m_a z_a+m_b z_b=mz.
+  \label{eq:centroid-conservation}
+\end{equation}
+
+The inverse map merges an unordered pair $a<b$:
+\begin{equation}
+  \mergemap_{ab}(X)
+  =X\setminus\{(m_a,z_a),(m_b,z_b)\}
+   \cup\left\{\left(m_a+m_b,
+   \frac{m_a z_a+m_b z_b}{m_a+m_b}\right)\right\}.
+  \label{eq:merge-map}
+\end{equation}
+
+To avoid counting the same split twice, let $\mathcal U_+$ contain exactly one of $u$ and $-u$ for almost every nonzero $u$.  One choice is the set in which the first nonzero coordinate is positive.  We take split marks in
+\begin{equation}
+  \mathcal A=(0,1)\times\mathcal U_+.
+\end{equation}
+Given two distinct children, canonical orientation determines $u=z_b-z_a\in\mathcal U_+$ and then
+\begin{equation}
+  m=m_a+m_b,\qquad
+  \rho=\frac{m_a}{m},\qquad
+  z=\frac{m_a z_a+m_b z_b}{m}.
+  \label{eq:inverse-split-coordinates}
+\end{equation}
+
+\subsection{Deletion and nucleation}
+
+The deletion map transfers an entire component to the reservoir:
+\begin{equation}
+  \deathmap_i(X)
+  =\left(v+m_i;\{(m_j,z_j):j\neq i\}\right).
+  \label{eq:death-map}
+\end{equation}
+Its inverse is a birth or nucleation event.  For $0<m\leq v$,
+\begin{equation}
+  \birthmap_{m,z}(X)
+  =\left(v-m;\{(m_i,z_i)\}_{i=1}^{N(X)}\cup\{(m,z)\}\right).
+  \label{eq:birth-map}
+\end{equation}
+The equality case $m=v$ maps to the boundary $v=0$.  All coordinate-density
+formulas below use the interior case $0<m<v$.  With reservoir-dequantized
+data, finite flow times, and split fractions in $(0,1)$, the forward law
+stays in that interior before deletion; reversing a deletion then indeed has
+$m<v$ because the pre-deletion reservoir was strictly positive.
+Unlike a model restricted to single-component insertion without a
+pair-merge operation, births here are followed by learned pairwise merges.
+The representation of a final component can therefore be assembled from
+several nucleated pieces.
+
+\begin{proposition}[Exact conservation of every operation]
+\label{prop:event-conservation}
+The flows in \eqref{eq:forward-flow-mi}--\eqref{eq:forward-flow-v} and
+\eqref{eq:reverse-growth-flow}, and the maps
+$\splitmap_i$, $\mergemap_{ab}$, $\deathmap_i$, and $\birthmap_{m,z}$ all preserve $\mathcal M(X)=M$.
+\end{proposition}
+
+\begin{proof}
+For either flow, summing the derivatives of $v$ and all $m_i$ gives zero.  A split replaces $m$ by $\rho m+(1-\rho)m=m$, and a merge performs the reverse operation.  A deletion adds $m_i$ to $v$ before removing $m_i$; a birth subtracts the same amount from $v$ before inserting it.  Therefore every operation leaves the total unchanged.
+\end{proof}
+
+\subsection{A complete numerical example}
+
+Take $M=10$ and $q=1$, so each $z_i$ is a scalar position.  Consider the
+initial state
+\begin{equation}
+  X_0=\left(2;\{(3,1),(5,4)\}\right)\in\state_2.
+  \label{eq:worked-example-initial}
+\end{equation}
+Here the reservoir has mass $2$, the two components have masses $3$ and $5$,
+and their positions are $1$ and $4$.  The total is $2+3+5=10=M$.
+
+Split the component $(m,z)=(5,4)$ using $\rho=0.4$ and $u=2$.  Equations
+\eqref{eq:split-a}--\eqref{eq:split-b} give
+\begin{equation}
+  (5,4)\longmapsto(2,2.8),(3,4.8).
+  \label{eq:worked-example-split}
+\end{equation}
+The resulting state is
+\begin{equation}
+  X_{t_1}=\left(2;\{(3,1),(2,2.8),(3,4.8)\}\right)
+  \in\state_3.
+  \label{eq:worked-example-after-split}
+\end{equation}
+The split preserves mass, and it also preserves the weighted feature because
+$2(2.8)+3(4.8)=5(4)=20$.
+
+Suppose a subsequent flow segment reduces the total component mass from
+$8$ to $6$.  The basic flow preserves relative masses, so it multiplies
+each component mass by $6/8=3/4$ and transfers the remaining mass to the
+reservoir:
+\begin{equation}
+  X_{t_2}
+  =\left(4;\{(2.25,1),(1.5,2.8),(2.25,4.8)\}\right)
+  \in\state_3.
+  \label{eq:worked-example-after-flow}
+\end{equation}
+The continuous flow changes $v$ and the masses but not the cardinality or
+features.  If the component $(1.5,2.8)$ is then deleted, its mass enters the
+reservoir and
+\begin{equation}
+  X_{t_3}
+  =\left(5.5;\{(2.25,1),(2.25,4.8)\}\right)
+  \in\state_2.
+  \label{eq:worked-example-after-deletion}
+\end{equation}
+Every displayed state has total mass $10$.  Reversing these operations first
+births $(1.5,2.8)$, then reverses the flow, and finally merges
+$(2,2.8)$ with $(3,4.8)$.  The merged component has
+\begin{equation}
+  m=2+3=5,
+  \qquad
+  z=\frac{2(2.8)+3(4.8)}{5}=4,
+\end{equation}
+so the reverse sequence recovers \eqref{eq:worked-example-initial} exactly.
+
+The continuous flow and four jump operations move between strata as follows:
+\begin{center}
+\begin{tabular}{lll}
+\toprule
+Operation & Stratum change & Quantities changed directly \\
+\midrule
+Continuous flow & $\state_n\to\state_n$ & $v,m_i$ \\
+Split & $\state_n\to\state_{n+1}$ & one component becomes two \\
+Deletion & $\state_n\to\state_{n-1}$ & one component moves into $v$ \\
+Birth & $\state_n\to\state_{n+1}$ & mass moves out of $v$ \\
+Merge & $\state_n\to\state_{n-1}$ & two components become one \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+\section{The forward fragmentation--evaporation process}
+\label{sec:forward}
+
+\subsection{Two stages}
+
+Choose $0<\tau<T$.  The forward process starts at $X_0\sim\pdata$ and has two stages.
+
+\paragraph{Stage F: fragmentation, $0\leq t\leq\tau$.}
+Each component splits at rate $\beta(t)$, where
+$0\leq\beta(t)\leq\beta_{\max}<\infty$, provided that
+$N(X)<N_{\max}$.  Conditional on a split, the parent is therefore uniform
+among the current components.  The split mark has a known normalized density
+\begin{equation}
+  \kappa_t(\rho,u\mid X,i)
+  \quad\text{on }\mathcal A.
+  \label{eq:split-kernel}
+\end{equation}
+A ``density on $\mathcal A$'' means a nonnegative function integrating to
+one relative to $\dd\rho\,\lambda_q(\dd u)$ restricted to
+$\mathcal U_+$.  It may depend jointly on the full state and the selected
+parent; no factorization of $\rho$ and $u$ is assumed.
+A simple choice is a symmetric Beta density for $\rho$ and a half-space Gaussian density for $u$.  The evaporation flow \eqref{eq:forward-flow-mi}--\eqref{eq:forward-flow-v} acts between events.  There are no deletion events in this stage.
+
+\paragraph{Stage E: evaporation and deletion, $\tau<t<T$.}
+Splitting is turned off.  Every remaining component is deleted with hazard
+\begin{equation}
+  \delta(t)=\frac{1}{T-t}.
+  \label{eq:death-hazard}
+\end{equation}
+The conservative evaporation flow continues between deletions.  Because
+\begin{equation}
+  \exp\!\left(-\int_\tau^t\delta(u)\dd u\right)
+  =\frac{T-t}{T-\tau},
+  \label{eq:uniform-death-survival}
+\end{equation}
+the deletion time of each component alive at $\tau$ is uniform on $(\tau,T)$.  This observation gives an efficient exact simulator.
+
+\subsection{Jump generator}
+
+For a bounded test function $f:\state\to\R$, the jump part of the forward generator is
+\begin{align}
+  (\mathcal J_t f)(X)
+  ={}&\ind\{t\leq\tau,\,N(X)<N_{\max}\}
+  \sum_{i=1}^{N(X)}\beta(t)
+  \int_{\mathcal A}
+  \left[f\!\left(\splitmap_i(X;\rho,u)\right)-f(X)\right]
+  \kappa_t(\rho,u\mid X,i)\dd\rho\dd u
+  \nonumber\\
+  &+\ind\{t>\tau\}
+  \sum_{i=1}^{N(X)}\delta(t)
+  \left[f\!\left(\deathmap_i(X)\right)-f(X)\right].
+  \label{eq:forward-jump-generator}
+\end{align}
+The full generator adds the directional derivative along the deterministic mass flow.  This makes $X_t$ a time-inhomogeneous piecewise-deterministic Markov process.
+
+\begin{theorem}[Well-posedness and exact terminal state]
+\label{thm:forward-terminal}
+Suppose $N(X_0)\leq N_{\max}$ almost surely,
+$\beta(t)\leq\beta_{\max}<\infty$, and
+$\int_0^T\gamma(t)\dd t<\infty$.  Then:
+\begin{enumerate}
+  \item the forward process has finitely many jumps on every interval $[0,t]$ with $t<T$;
+  \item masses and reservoir mass remain nonnegative and sum to $M$;
+  \item $X_t\to\emptyconfig$ almost surely as $t\uparrow T$.  We may therefore set $X_T=\emptyconfig$.
+\end{enumerate}
+\end{theorem}
+
+\begin{proof}
+During Stage F, a state with $n$ components has total split rate at most
+$n\beta_{\max}\leq N_{\max}\beta_{\max}$.  Moreover, each split raises
+cardinality by one and splitting stops at $N_{\max}$.  Thus there are at most
+$N_{\max}-N(X_0)$ splits.
+
+At the boundary $m_i=0$, the derivative in \eqref{eq:forward-flow-mi} is zero.  At $v=0$, both derivatives in \eqref{eq:forward-flow-mi}--\eqref{eq:forward-flow-v} are zero.  Hence the flow cannot leave the nonnegative simplex.  Proposition~\ref{prop:event-conservation} shows that jumps also preserve the simplex and total mass.
+
+There are finitely many components at time $\tau$.  By \eqref{eq:uniform-death-survival}, each one has probability zero of surviving until $T$.  A finite union of probability-zero survival events still has probability zero.  Consequently all components are deleted before $T$ almost surely, and every deletion transfers its remaining mass to $v$.  The terminal state is therefore $(M;\varnothing)$.
+\end{proof}
+
+\begin{remark}[Why the singular-looking hazard is useful]
+The hazard $1/(T-t)$ diverges, but every realized deletion time is strictly smaller than $T$ almost surely.  The process has only finitely many components in Stage E, so it still has finitely many deletion events.  The divergence solves a real modeling problem: a bounded deletion hazard would leave a nonzero probability of a nonempty terminal state.
+\end{remark}
+
+\section{Finite-horizon time reversal}
+\label{sec:reverse}
+
+\subsection{The measure-level formula}
+
+The safest reversal formula is written using measures, before choosing coordinates.
+
+\begin{definition}[Forward jump flux]
+Let $Q_t(X,\dd Y)$ be the forward jump-rate kernel.  The jump flux at time $t$ is the measure
+\begin{equation}
+  \Gamma_t(\dd X,\dd Y)
+  =P_t(\dd X)Q_t(X,\dd Y).
+  \label{eq:forward-flux}
+\end{equation}
+It describes probability per unit time moving from $X$ to $Y$.
+\end{definition}
+
+\begin{assumption}[Regularity for finite-horizon reversal]
+\label{ass:reversal-regularity}
+The state space is standard Borel.  The forward process is a Borel-right,
+non-explosive piecewise-deterministic Markov process.  Within each stratum,
+the flow before it reaches a boundary is a measurable $C^1$ bijection.
+Interior jumps are not simultaneous and do not occur at predictable times.
+The transposed incoming jump flux is absolutely continuous with respect to
+the current marginal law, and the marginal laws and fluxes are regular in
+time wherever the rates below are evaluated.
+\end{assumption}
+
+\begin{theorem}[Finite-horizon reverse jump kernel]
+\label{thm:reverse-kernel}
+Under Assumption~\ref{ass:reversal-regularity}, define
+$\overline Q_{T-t}$ by the disintegration
+\begin{equation}
+  P_t(\dd Y)\overline Q_{T-t}(Y,\dd X)
+  =P_t(\dd X)Q_t(X,\dd Y).
+  \label{eq:flux-reversal}
+\end{equation}
+Set $Y_0=X_T$, $Y_T=X_0$, and, for $0<s<T$, use the c\`adl\`ag
+reversal
+\begin{equation}
+  Y_s=X_{(T-s)-}.
+  \label{eq:cadlag-reversal}
+\end{equation}
+Then $Y$ is Markov.  Between jumps it follows the inverse deterministic
+flow, and its jump-rate kernel is $\overline Q_s$.
+\end{theorem}
+
+\begin{proof}[Proof sketch]
+Fix $t$ and a small $h>0$.  To first order in $h$, the joint measure of a forward jump from $X$ at time $t-h$ to $Y$ at time $t$ is
+\[
+  h\,P_{t-h}(\dd X)Q_{t-h}(X,\dd Y)+o(h).
+\]
+Under the stated time regularity, replacing both $P_{t-h}$ and $Q_{t-h}$
+by their time-$t$ versions changes only the $o(h)$ term.  Bayes' rule
+conditions this joint measure on the endpoint $Y$.  The resulting
+conditional rate is exactly the disintegration in
+\eqref{eq:flux-reversal}.  When no jump occurs, a forward deterministic
+segment is traversed backward, so its velocity changes sign.  Applying the
+same argument at each time proves the Markov property and identifies the
+reverse characteristics.
+The stated regularity justifies the disintegration and passage from the
+short-time identity to the Markov characteristics; see
+\cite{conforti2022time} for a general treatment.  The left limit in
+\eqref{eq:cadlag-reversal} makes the reversed path right-continuous: at a
+forward jump time $t$, the reverse pre-jump state is $X_t$ and the reverse
+post-jump state is $X_{t-}$.
+\end{proof}
+
+Equation~\eqref{eq:flux-reversal} is a finite-time statement.  It depends on the current marginal $P_t$.  It is not the same as equilibrium detailed balance.
+
+\begin{remark}[The terminal point mass is an entrance law]
+At $t=T$, the forward law is the point mass at $\emptyconfig$, so
+stratum-wise density ratios are used only for $0<t<T$.  The exact reverse at
+$s=0$ is understood as the entrance-law limit of $X_{(T-s)-}$ as
+$s\downarrow0$.
+This limit is unambiguous even though the coordinate density formula is not
+defined at the point mass itself.  A numerical implementation may instead
+start at reverse time $s=\varepsilon$ from $\emptyconfig$, where
+$0<\varepsilon<T-\tau$.  By
+\eqref{eq:uniform-death-survival} and a union bound,
+\begin{equation}
+  \TV\!\left(P_{T-\varepsilon},\delta_{\emptyconfig}\right)
+  =\Pp(N_{T-\varepsilon}>0)
+  \leq
+  \frac{\E[N(X_\tau)]\,\varepsilon}{T-\tau}
+  \leq\frac{N_{\max}\varepsilon}{T-\tau}.
+  \label{eq:entrance-tv-bound}
+\end{equation}
+Markov kernels contract total variation, so the same quantity bounds the
+endpoint error caused solely by this $\varepsilon$-start approximation when
+the remaining reverse dynamics are exact.
+\end{remark}
+
+\subsection{Coordinate Jacobian for a split}
+
+For one parent, the coordinate map is
+\begin{equation}
+  (m,\rho,z,u)\longmapsto(m_a,m_b,z_a,z_b)
+\end{equation}
+with definitions \eqref{eq:split-a}--\eqref{eq:split-b}.
+
+\begin{lemma}[Split Jacobian]
+\label{lem:split-jacobian}
+The absolute determinant of the above map is
+\begin{equation}
+  \left|\frac{\partial(m_a,m_b,z_a,z_b)}
+  {\partial(m,\rho,z,u)}\right|=m.
+  \label{eq:split-jacobian}
+\end{equation}
+\end{lemma}
+
+\begin{proof}
+The mass block $(m,\rho)\mapsto(\rho m,(1-\rho)m)$ has absolute determinant $m$.  For each feature coordinate, the map $(z,u)\mapsto(z-(1-\rho)u,z+\rho u)$ has matrix
+\[
+  \begin{pmatrix}1&-(1-\rho)\\1&\rho\end{pmatrix}
+\]
+and determinant one.  The full derivative is block lower triangular because the child masses do not depend on $(z,u)$.  Multiplying the determinants gives $m$.
+\end{proof}
+
+\begin{assumption}[Densities for coordinate formulas]
+\label{ass:stratum-densities}
+For every relevant $n$ and $0<t<T$, the marginal restricted to a stratum is
+dominated by its reference measure:
+\begin{equation}
+  P_t|_{\state_n}\ll\mu_n.
+\end{equation}
+Its density $p_{t,n}$ is positive at every state where a density ratio is
+evaluated.  The measure identity in Theorem~\ref{thm:reverse-kernel} does not
+need this assumption; only the coordinate ratios below do.  The random
+reservoir augmentation in \eqref{eq:reservoir-dequantization} is one way to
+avoid a singular data law.
+\end{assumption}
+
+The assumption rules out atoms on $v=0$ and singular feature laws.  It is
+preserved by the intended interior construction under ordinary smoothness
+conditions: for a finite flow interval,
+$m_i(t)=m_i(t_0)\exp[-\int\gamma(u)v(u)/M\,\dd u]>0$; an initially positive
+reservoir remains positive; split fractions lie in $(0,1)$; and continuous
+split and birth marks hit $u=0$ or exact feature collisions only on null
+sets.  Absolute continuity nevertheless remains an explicit assumption,
+because arbitrary data or mark kernels need not satisfy it.
+
+\subsection{Explicit birth and merge rates}
+
+Let $s=T-t$ denote reverse time.  We now write the exact reverse rates under the reference convention \eqref{eq:reference-measure}.
+
+\begin{proposition}[Exact reverse of deletion]
+\label{prop:reverse-death}
+Let $Y\in\state_{n-1}$ and let $X=\birthmap_{m,z}(Y)\in\state_n$.  Define
+$d_t(X;m,z)$ as the forward per-component deletion intensity of the
+component $(m,z)$ in $X$; in the present model it is
+$\ind\{t>\tau\}\delta(t)$.  Then the reverse birth intensity, as a density
+with respect to $\dd m\,\lambda_q(\dd z)$, is
+\begin{equation}
+  a_s^*(m,z\mid Y)
+  =d_t(X;m,z)\frac{p_{t,n}(X)}{p_{t,n-1}(Y)},
+  \qquad t=T-s.
+  \label{eq:exact-birth-rate}
+\end{equation}
+There is no extra factor of $n$: the sum over the $n$ possible deleted labels cancels the ratio between $1/n!$ and $1/(n-1)!$.
+\end{proposition}
+
+\begin{proof}
+Consider all labeled representations of $X$ and sum the forward deletion flux over the deleted index.  Symmetry makes the $n$ terms equal, while the reference measure contributes $1/n!$.  Thus $n/n!=1/(n-1)!$, which is precisely the factor in the reference measure of $Y$.  The coordinate transformation $(Y,m,z)\mapsto X$ has determinant one.  Substituting these facts into \eqref{eq:flux-reversal} gives \eqref{eq:exact-birth-rate}.
+\end{proof}
+
+\begin{proposition}[Exact reverse of fragmentation]
+\label{prop:reverse-split}
+Let $X\in\state_n$ with $n<N_{\max}$ and let
+$Y=\splitmap_i(X;\rho,u)\in\state_{n+1}$.  Suppose the forward marked split intensity is
+\begin{equation}
+  r_t^{\mathrm{split}}(X,i,\rho,u)
+  =\beta(t)\kappa_t(\rho,u\mid X,i)
+  \label{eq:marked-split-intensity}
+\end{equation}
+with canonical $u\in\mathcal U_+$.  Let $a<b$ be the resulting pair in $Y$ and let $m=m_a+m_b$.  Then the exact reverse merge intensity for this unordered pair is
+\begin{equation}
+  k_s^*(a,b\mid Y)
+  =\frac{1}{m}\,
+  r_t^{\mathrm{split}}(X,i,\rho,u)
+  \frac{p_{t,n}(X)}{p_{t,n+1}(Y)},
+  \qquad t=T-s.
+  \label{eq:exact-merge-rate}
+\end{equation}
+No additional cardinality or factor-of-two correction appears under the
+canonical-orientation convention.  The formula is stated on the
+full-measure set $z_a\neq z_b$; the excluded diagonal corresponds to
+$u=0$.
+\end{proposition}
+
+\begin{proof}
+After selecting the parent, the forward reference factor is
+$n/n!=1/(n-1)!$.  If child coordinates are first integrated as an ordered
+pair, selecting an unordered pair contributes
+$\binom{n+1}{2}/(n+1)!=1/[2(n-1)!]$.  However, an unordered pair has two
+ordered representations in the labeled-coordinate integral.  That full
+integral is twice its representation on the canonical half-space
+$u\in\mathcal U_+$, which cancels the factor $1/2$.  Thus both the
+selected-parent measure and the canonically oriented
+selected-pair measure carry $1/(n-1)!$.  By
+Lemma~\ref{lem:split-jacobian},
+$\dd m_a\dd m_b\dd z_a\dd z_b=m\,\dd m\dd\rho\dd z\dd u$.
+Equating the two flux densities in \eqref{eq:flux-reversal} therefore
+multiplies the forward marked intensity by $1/m$.  The remaining factor is
+the marginal density ratio $p_{t,n}(X)/p_{t,n+1}(Y)$.
+\end{proof}
+
+The density ratios in \eqref{eq:exact-birth-rate} and
+\eqref{eq:exact-merge-rate} are not available for real data.
+Section~\ref{sec:learning} derives a simulation-based objective whose
+population optimum recovers the same reverse event law under the joint
+realizability and support assumptions of
+Theorem~\ref{thm:intensity-consistency}, without evaluating these ratios.
+
+\subsection{Why detailed balance is not the derivation}
+
+For a time-homogeneous process with stationary law $\pi$, detailed balance is
+the equality of measures
+\begin{equation}
+  \pi(\dd X)Q(X,\dd Y)=\pi(\dd Y)Q(Y,\dd X).
+  \label{eq:detailed-balance}
+\end{equation}
+For example, applying the same split coordinates as above would give
+\begin{equation}
+  k^{\mathrm{merge}}(Y,a,b)
+  =\frac{1}{m_a+m_b}\,
+    r^{\mathrm{split}}(X,\rho,u)
+    \frac{\pi_n(X)}{\pi_{n+1}(Y)}.
+  \label{eq:stationary-merge-rate}
+\end{equation}
+After expressing mass and feature coordinates in fixed reference units, if
+$\pi_n(X)\propto\exp[-\beta_{\mathrm{th}} F_n(X)]$ relative to the same stratum
+measures, then
+\begin{equation}
+  \log\frac{k^{\mathrm{merge}}(Y,a,b)}
+                 {r^{\mathrm{split}}(X,\rho,u)}
+  =\beta_{\mathrm{th}}\{F_{n+1}(Y)-F_n(X)\}
+   -\log\!\left(\frac{m_a+m_b}{m_0}\right),
+  \label{eq:gibbs-rate-ratio}
+\end{equation}
+where $m_0>0$ is a reference mass; its constant contribution can be
+absorbed into the rate convention.  This expression is still subject to
+any explicitly chosen base-measure terms.  Our process is instead
+time-inhomogeneous and transports a data distribution to an absorbing state.
+Its reverse depends on $p_{t,n}$, not on a stationary Gibbs law.  A learned
+free energy may still regularize rates, but it cannot replace the
+finite-horizon flux calculation.
+
+\section{Learning from reversed forward paths}
+\label{sec:learning}
+
+\subsection{Latent histories}
+
+A forward history $H$ contains
+\begin{itemize}
+  \item all split times, selected parents, and split marks $(\rho,u)$;
+  \item all deletion times and the deleted component states just before deletion;
+  \item the deterministic flow segments between events;
+  \item persistent lineage identifiers, used only to identify inverse merge pairs.
+\end{itemize}
+Conditional on $(X,$ event times, split marks, and discrete choices$)$, the
+recorded pre-deletion component states and flow segments are deterministic.
+They are stored for implementation convenience but are not additional
+coordinates of the history reference measure.
+By Theorem~\ref{thm:forward-terminal}, every history ends at $\emptyconfig$.  Reverse the event order and replace every deletion by a birth and every split by a merge.  The resulting history is denoted $R(H)$.  It begins at $\emptyconfig$ and ends at the original data state.
+
+Let $Q_X^F$ be the forward-history law conditional on $X_0=X$, with density
+$q_X^F(H)$ relative to a history reference measure $\nu_X(\dd H)$.  It is
+important to reverse the \emph{joint} coordinates $(X,H)$, not $H$ alone.
+More precisely, the history space is a disjoint union over the finite
+numbers of events and their discrete lineage patterns.  On each piece,
+$\nu_X$ is Lebesgue measure on the ordered event-time simplices and
+continuous split marks, multiplied by counting measure on parent, deletion,
+and lineage choices.  The raw reverse-record space is defined in the same
+way: its reference measure $\varrho(\dd R)$ is Lebesgue measure on ordered
+birth and merge times and continuous birth marks, multiplied by counting
+measure on the event counts and merge-pair choices.
+
+Choose a fixed Borel ordering of component coordinates, such as
+lexicographic order, away from its measure-zero set of ties.  On this
+canonical chamber, the quotient measure $\mu_n$ is ordinary coordinate
+volume: the $n!$ labeled chambers in
+\eqref{eq:reference-measure} cancel its factor $1/n!$.  New lineages are
+assigned by event order and canonical child orientation.  Arbitrary lineage
+renamings are therefore not additional outcomes.  The factor $1/n!$ occurs
+only in $\mu_n$.  Likewise, $\varrho$ is plain volume on the ordered
+birth-time simplex; the factor $L!$ below is part of its probability density
+and occurs only once.
+Define
+\begin{equation}
+  \Psi:(X,H)\longmapsto R,
+  \label{eq:joint-reversal-map}
+\end{equation}
+where $R$ is the raw reverse event record, including event times, birth
+marks, and merge choices.  The endpoint coordinates in $X$ become the birth
+marks missing from a conditional forward history.
+
+This resolves a simple dimension check.  Suppose $X$ has $n$ components,
+the forward history has $C$ splits, and therefore $L=n+C$ deletions.  With
+discrete lineages fixed, the continuous dimension on the forward side is
+\begin{equation}
+  n(q+1)+C(q+2)+L,
+\end{equation}
+while the reverse record has dimension
+\begin{equation}
+  L(q+2)+C.
+\end{equation}
+These are equal because $L=n+C$.  On each fixed lineage pattern, $\Psi$ is
+a square, almost-everywhere differentiable bijection.  Its absolute
+Jacobian is denoted $J_\Psi(X,H)$.  Appendix~\ref{app:forward-density}
+gives an explicit product formula.
+
+\begin{lemma}[Joint history change of variables]
+\label{lem:joint-history-change}
+Outside simultaneous events, feature collisions, and coordinate-ordering
+ties, the map $\Psi$ is a bijection from admissible endpoint--forward-history
+pairs to admissible raw reverse records.  If
+$\mathcal L_\theta$ is a normalized density relative to $\varrho$, then
+\begin{equation}
+  \sum_{n=0}^{N_{\max}}\int_{\state_n}\int
+  \mathcal L_\theta(\Psi(X,H))J_\Psi(X,H)
+  \nu_X(\dd H)\mu_n(\dd X)=1.
+  \label{eq:joint-change-normalization}
+\end{equation}
+\end{lemma}
+
+\begin{proof}
+Given $(X,H)$, reverse the event order, turn each deletion into a birth, and
+turn each split into a merge.  This constructs one record $R$.  Conversely,
+simulate any admissible $R$ from $\emptyconfig$ to obtain its endpoint $X$;
+then reverse every deterministic segment and event to recover $H$.  The
+canonical component ordering and lineage rules make these constructions
+inverse to each other.  The excluded cases are null under the continuous
+reference measures.
+
+On a fixed lineage piece, ordinary multivariate change of variables gives
+the integrand in \eqref{eq:joint-change-normalization}; the dimensions match
+by the calculation above.  Summing first over its discrete patterns and then
+over $n$ gives
+$\int\mathcal L_\theta(R)\varrho(\dd R)=1$.  Because $\mu_n$ equals
+coordinate volume on the canonical chamber, no extra $n!$ appears.  Because
+event times are already ordered in $\varrho$, no second $L!$ appears.
+\end{proof}
+
+\subsection{Path-space evidence lower bound}
+
+\begin{theorem}[Path-space ELBO]
+\label{thm:path-elbo}
+Let $\mathcal L_\theta(R)$ be the density of a raw reverse event record
+relative to $\varrho$.  For $X\in\state_n$, define the joint
+endpoint--history density, relative to
+$\mu_n(\dd X)\nu_X(\dd H)$, by
+\begin{equation}
+  p_{\theta,n}(X,H)
+  =\mathcal L_\theta(\Psi(X,H))J_\Psi(X,H).
+  \label{eq:joint-generative-density}
+\end{equation}
+Let
+$p_{\theta,n}(X)=\int p_{\theta,n}(X,H)\nu_X(\dd H)$, including the sum
+over discrete lineage patterns.  Lemma~\ref{lem:joint-history-change} shows
+that these are the stratum densities of a normalized endpoint law.  Then,
+whenever the supports are compatible,
+\begin{equation}
+  \log p_{\theta,n}(X)
+  \geq
+  \E_{H\sim Q_X^F}
+  \left[
+    \log\mathcal L_\theta(\Psi(X,H))
+    +\log J_\Psi(X,H)
+    -\log q_X^F(H)
+  \right].
+  \label{eq:path-elbo}
+\end{equation}
+Equality holds when $Q_X^F$ is the model posterior over $H$ given $X$.
+\end{theorem}
+
+\begin{proof}
+Since $q_X^F$ is normalized,
+\begin{align*}
+  p_{\theta,n}(X)
+  &=\int p_{\theta,n}(X,H)\nu_X(\dd H)\\
+  &=\E_{H\sim Q_X^F}
+  \left[\frac{p_{\theta,n}(X,H)}{q_X^F(H)}\right].
+\end{align*}
+Insert \eqref{eq:joint-generative-density}, take logarithms, and apply
+Jensen's inequality.  Equality requires the importance ratio to be constant,
+which is exactly the posterior condition.
+\end{proof}
+
+In the core model with prescribed flow and corruption,
+only $\log\mathcal L_\theta$ depends on $\theta$.  Thus training needs only
+sampled forward histories and the trainable reverse-record likelihood.  A
+numerical ELBO additionally uses $q_X^F$, $J_\Psi$, and, for normalized raw
+data, the dequantization terms from \eqref{eq:reservoir-dequantization}.
+
+\subsection{Learned reverse event model}
+
+Reverse time has two stages in the opposite order.
+
+\paragraph{Auxiliary leaf budget.}
+Let
+\begin{equation}
+  L=N(X_\tau)\in\{0,\ldots,N_{\max}\}
+  \label{eq:leaf-budget}
+\end{equation}
+be the number of components present when forward deletion begins.  The
+generative model first samples
+\begin{equation}
+  L\sim\Pi_\theta(L\mid M,y),
+  \label{eq:leaf-count-model}
+\end{equation}
+where $y$ denotes optional conditioning information.  This is an auxiliary
+pre-coagulation count, not the final output cardinality.
+
+\paragraph{Stage N: nucleation, $0<s<S_N=T-\tau$.}
+Conditional on $L$, the reversed deletion times are the order statistics of
+$L$ independent $\operatorname{Uniform}(0,S_N)$ variables.  Equivalently,
+when $N(X)<L$, the next-birth hazard is
+\begin{equation}
+  B_L(X,s)=\frac{L-N(X)}{S_N-s},
+  \qquad 0\leq s<S_N,
+  \label{eq:fixed-birth-bridge}
+\end{equation}
+and it is zero when $N(X)=L$.  The apparent deadline singularity is benign:
+there are exactly $L\leq N_{\max}$ births, all strictly before $S_N$ almost
+surely.  The state follows the growth flow between them.  Conditional on a
+birth, its mass and feature have learned normalized density
+\begin{equation}
+  A_\theta^{(m)}(m,z\mid X,s,L),
+  \qquad 0<m<v.
+  \label{eq:birth-mark-model}
+\end{equation}
+The timing rule is fixed; only the leaf-count law and birth marks are learned.
+Marginalizing $L$ gives a valid latent-mixture birth process, but it need not
+be Markov in $X$ alone because the posterior law of $L$ can depend on the
+past.  Keeping $(X,L)$ as the augmented state makes the process Markov and
+makes exact birth-count support and non-explosion explicit.
+
+\paragraph{Stage C: coagulation, $T-\tau<s<T$.}
+The growth flow continues.  Each unordered pair $a<b$ has merge intensity
+\begin{equation}
+  K_\theta(a,b\mid X,s)\geq0,
+  \label{eq:merge-model}
+\end{equation}
+and the total event rate is
+\begin{equation}
+  K_\theta^{\mathrm{tot}}(X,s)
+  =\sum_{a<b}K_\theta(a,b\mid X,s).
+  \label{eq:total-merge-rate}
+\end{equation}
+
+For a reversed training path, use the c\`adl\`ag convention
+$\widetilde X_s=X_{(T-s)-}$ in the interior, with the endpoint conventions
+of \eqref{eq:cadlag-reversal}.  Let $\mathcal E_B$ and $\mathcal E_C$ be its
+birth and merge events.  Its trainable negative log likelihood is
+\begin{align}
+  \mathcal L_{\mathrm{path}}(\theta;H)
+  ={}&
+  -\log\Pi_\theta(L\mid M,y)
+  -\sum_{e\in\mathcal E_B}
+    \log A_\theta^{(m)}(m_e,z_e\mid\widetilde X_{s_e^-},s_e,L)
+  \nonumber\\
+  &+\int_{S_N}^{T}K_\theta^{\mathrm{tot}}(\widetilde X_s,s)\dd s
+  -\sum_{e\in\mathcal E_C}
+  \log K_\theta(a_e,b_e\mid\widetilde X_{s_e^-},s_e).
+  \label{eq:path-loss}
+\end{align}
+The ordered birth times have fixed density $L!/S_N^L$; its hazard and
+survival terms do not depend on $\theta$ and are omitted from
+\eqref{eq:path-loss}.  Flow Jacobians and prescribed forward terms are also
+fixed in $\theta$ and appear only in the numerical ELBO.
+
+The merge survival integral is essential.  Training only observed pair
+labels would learn which merge occurred but not its timing or stopping law.
+
+\subsection{Unbiased integral estimator}
+
+For any interval $[a,b]$ and path-dependent rate $\Lambda_\theta(s)$,
+\begin{equation}
+  \int_a^b\Lambda_\theta(s)\dd s
+  =(b-a)\E_{U\sim\mathrm{Unif}(a,b)}[\Lambda_\theta(U)].
+  \label{eq:uniform-integral-estimator}
+\end{equation}
+Thus one or more uniform times give an unbiased estimator of the merge
+survival integral.  If the merge stage is divided into event-free intervals
+$I_j=[a_j,b_j]$, a one-sample stratified estimator is
+\begin{equation}
+  \sum_j |I_j|\,K_\theta^{\mathrm{tot}}(\widetilde X_{U_j},U_j),
+  \qquad U_j\sim\operatorname{Uniform}(I_j).
+  \label{eq:stratified-integral-estimator}
+\end{equation}
+The interval-length factors are required for unbiasedness.
+
+\subsection{Population consistency}
+
+The following theorem states the model-class condition behind the consistency
+claim.
+
+\begin{theorem}[Fisher consistency of factorized reverse learning]
+\label{thm:intensity-consistency}
+Let $\Pi^*$, $A^{*(m)}$, and $K^*$ be the exact leaf-count law, conditional
+birth-mark densities, and merge intensities of the augmented reverse
+process.  Assume \emph{joint realizability}: there is one parameter value
+$\theta^*$ for which all three model factors equal these exact factors
+simultaneously.  Also assume that the learned factors assign positive
+density or intensity wherever the exact factors are positive, and that the
+displayed cross-entropies and compensator integrals are finite.  Then the population risk of
+\eqref{eq:path-loss} is minimized by
+$\Pi_\theta=\Pi^*$, $A_\theta^{(m)}=A^{*(m)}$, and $K_\theta=K^*$ almost everywhere
+under the exact reverse path law.
+\end{theorem}
+
+\begin{proof}
+Subtract the risk at the exact factors.  The leaf-count term becomes the
+expected categorical divergence
+$\E[\KL(\Pi^*\,\|\,\Pi_\theta)]$.  Conditional on every birth pre-state,
+time, and $L$, the birth-mark term becomes
+$\KL(A^{*(m)}\,\|\,A_\theta^{(m)})$; summing over births and taking expectation keeps it
+nonnegative.  For the merge process, the compensator identity turns the
+excess risk into
+\begin{equation}
+  \E\int_{S_N}^{T}\sum_{a<b}
+  \left[
+    K_\theta-K^*+K^*\log\frac{K^*}{K_\theta}
+  \right]\dd s.
+  \label{eq:intensity-divergence}
+\end{equation}
+For positive $a,b$, $a-b+b\log(b/a)\geq0$, with equality only at $a=b$.
+We use the standard conventions $0\log(0/a)=0$ and assign infinite
+divergence when $b>0$ but $a=0$.  Every term is therefore nonnegative, and
+all vanish exactly at the stated jointly realizable factors.
+\end{proof}
+
+The theorem is conditional on joint realizability; it does not claim that a
+finite network recovers the exact factors from finite data.  In particular,
+the bounded-rate implementation below may exclude an exact bridge whose
+rate diverges near the endpoint.  The theorem does show why no
+explicit estimate of the marginal density ratios in
+\eqref{eq:exact-birth-rate}--\eqref{eq:exact-merge-rate} is required.
+
+\section{Neural parameterization}
+\label{sec:parameterization}
+
+\subsection{Permutation-equivariant encoder}
+
+Let $M_{\mathrm{ref}}>0$ be a fixed reference mass in the same units as
+$M$, and write $\ell_M=\log(M/M_{\mathrm{ref}})$.  This gives the networks a
+dimensionless total-mass input when examples have different $M$.
+For every component, form an embedding
+\begin{equation}
+  h_i=\phi_\theta\!\left(z_i,\frac{m_i}{M},s,\ell_M,y\right),
+  \label{eq:element-embedding}
+\end{equation}
+where $y$ denotes optional conditioning information.  A Deep Sets or Set Transformer backbone produces updated embeddings and a pooled summary
+\begin{equation}
+  (\widehat h_1,\ldots,\widehat h_n,g)
+  =\mathrm{SetNet}_\theta(h_1,\ldots,h_n).
+  \label{eq:set-backbone}
+\end{equation}
+The component outputs are permutation equivariant and $g$ is invariant
+\cite{zaheer2017deepsets,lee2019settransformer}.
+For the empty set, define $g=g_\varnothing$ using a learned null embedding
+(or a fixed zero vector followed by a network that also receives
+$v/M,s,\ell_M,L,y$).  This makes the first birth-mark distribution in
+Algorithm~3 well defined.
+
+\subsection{Leaf count and birth marks}
+
+The leaf-count head is a categorical distribution on a finite support:
+\begin{equation}
+  \Pi_\theta(\ell\mid M,y)
+  =\operatorname{softmax}\!\left(a_\theta(\ell_M,y)\right)_\ell,
+  \qquad \ell=0,\ldots,N_{\max}.
+  \label{eq:leaf-count-head}
+\end{equation}
+For theoretical statements, the categorical family includes boundary points
+with exact zero probabilities.  In code, a masked softmax enforces known
+structural zeros; an ordinary softmax represents the interior and approaches
+an unknown zero only in the limit.
+
+Write the birth mass as a fraction $\omega=m/v\in(0,1)$.  A fully
+normalized, directly implementable mark head is a mixture
+\begin{equation}
+  A_\theta^{(\omega)}(\omega,z\mid X,s,L)
+  =\sum_{j=1}^{J_{\mathrm{mix}}}\alpha_j^{\mathrm{mix}}
+  \operatorname{Beta}(\omega;\alpha_j,\beta_j)
+  \mathcal N(z;\bar z_j,\operatorname{diag}(\sigma_j^2)),
+  \label{eq:birth-mixture}
+\end{equation}
+where all parameters depend on $(g,v/M,s,\ell_M,L,y)$, the mixture weights
+$\alpha_j^{\mathrm{mix}}$ use a softmax, and positive parameters use
+softplus.  The density with respect to $\dd m\dd z$ is
+\begin{equation}
+  A_\theta^{(m)}(m,z\mid X,s,L)
+  =\frac{1}{v}A_\theta^{(\omega)}(m/v,z\mid X,s,L).
+  \label{eq:birth-density-jacobian}
+\end{equation}
+For high-dimensional features, the Gaussian mixture may be replaced by a conditional normalizing flow, provided its density and samples are tractable.
+
+\subsection{Merge intensity}
+
+For every candidate unordered pair, compute a symmetric logit
+\begin{equation}
+  \ell_{ab}
+  =\psi_\theta(\widehat h_a+\widehat h_b,
+                |\widehat h_a-\widehat h_b|,
+                g,s,\ell_M,y)
+  =\ell_{ba}.
+  \label{eq:pair-logit}
+\end{equation}
+When $N(X)\geq2$, let
+\begin{equation}
+  \pi_\theta(a,b\mid X,s)
+  =\frac{\exp(\ell_{ab})}{\sum_{i<j}\exp(\ell_{ij})}
+  \label{eq:pair-softmax}
+\end{equation}
+and parameterize a finite total rate with bounded average rate per pair,
+\begin{equation}
+  \Lambda_\theta^C(X,s)
+  =k_{\max}(s)\binom{N(X)}{2}
+  \sigma\!\left(g_\theta(g,s,\ell_M,y)\right).
+  \label{eq:bounded-total-merge}
+\end{equation}
+When $N(X)<2$, set $\Lambda_\theta^C=0$ and do not evaluate the pair softmax.
+Then
+\begin{equation}
+  K_\theta(a,b\mid X,s)
+  =\Lambda_\theta^C(X,s)\pi_\theta(a,b\mid X,s).
+  \label{eq:factorized-merge-rate}
+\end{equation}
+Because $\pi_\theta$ is normalized over the active candidate set,
+$K_\theta^{\mathrm{tot}}=\Lambda_\theta^C$.
+The scaling in \eqref{eq:bounded-total-merge} permits a bounded average rate
+per candidate pair.  Merge events cannot cause cardinality explosion because
+each one removes a component, although evaluating all logits still costs
+$O(N^2)$.
+
+The measure-level reverse kernel is exact, but its coordinate merge rate can
+be unbounded, for example near $s=T$ under a hard endpoint-cardinality
+restriction or as a parent mass approaches zero when the density ratio does
+not cancel the $1/m$ factor.  A finite $k_{\max}$ is then a regularized
+implementation and need not contain the exact bridge.  The consistency
+theorem applies only under its stated realizability assumption.  If exact hard final-count support is required,
+one may add a target-count bridge; we leave that extra conditioning variable
+out of the present model.
+
+For large sets, construct a symmetric candidate graph $\mathcal C(X)$ using
+$k$ nearest neighbors or learned locality, and normalize
+\eqref{eq:pair-softmax} only over $(a,b)\in\mathcal C(X)$.  In this sparse
+mode replace \eqref{eq:bounded-total-merge} by
+\begin{equation}
+  \Lambda_\theta^C(X,s)
+  =k_{\max}(s)|\mathcal C(X)|
+   \sigma\!\left(g_\theta(g,s,\ell_M,y)\right).
+  \label{eq:sparse-total-merge}
+\end{equation}
+This preserves the bounded average rate per scored candidate and reduces
+pair scoring to $O(|\mathcal C|)=O(Nk)$.  It is an approximation unless the
+true reverse assigns zero rate to omitted pairs.
+During likelihood training, every observed sibling pair must have nonzero
+model support.  This can be enforced by using all pairs, by constructing an
+equivariant candidate graph with guaranteed support, or by mixing a sparse
+proposal with a positive full-pair fallback.  Merely adding the target pair
+only during training would define a different model and is not valid.
+
+\begin{theorem}[Permutation invariance of the generated law]
+\label{thm:permutation}
+Suppose the set encoder is permutation equivariant, the pooled summary is
+invariant, the pair logit is symmetric, and the leaf-count and birth-mark
+heads depend only on invariant summaries.  In sparse mode, also suppose the
+candidate construction and its tie-breaking are permutation equivariant and
+retain the stated support.  Starting from $\emptyconfig$, the
+distribution of the reverse process is invariant under every relabeling of
+component indices at every time.
+\end{theorem}
+
+\begin{proof}
+The empty state and sampled scalar $L$ are invariant.  Assume the current law
+is invariant.  The fixed birth timing rule and birth-mark law are unchanged
+by relabeling, so a birth produces the same unordered law.  Merge logits
+permute in the same way as their pairs, while the softmax denominator is
+invariant; hence pair selection is equivariant.  The merge map itself is
+symmetric in its two inputs.  The deterministic flow acts identically on
+every component.  Induction over the finite event sequence proves invariance
+at every time.
+\end{proof}
+
+\begin{proposition}[Non-explosion of the learned sampler]
+\label{prop:reverse-nonexplosion}
+Assume $k_{\max}$ is bounded on $[S_N,T]$.  For every sampled
+$L\leq N_{\max}$, the reverse process has at most $L$ births and
+$\max\{L-1,0\}$ merges, hence at most $2N_{\max}-1$ jumps.
+\end{proposition}
+
+\begin{proof}
+The conditional timing rule produces exactly $L$ births.  Stage C contains
+no births, and each merge lowers cardinality by one, so it can contain at
+most $\max\{L-1,0\}$ merges.  The bound follows.  Boundedness of $k_{\max}$
+ensures every waiting-time calculation before the finite merge count is
+well defined.
+\end{proof}
+
+\section{Algorithms}
+\label{sec:algorithms}
+
+\subsection{Closed-form flow update}
+
+We use the following routine in all algorithms.  For a forward segment from
+$t_0$ to $t_1$, compute
+\begin{equation}
+  G=\int_{t_0}^{t_1}\gamma(u)\dd u,
+  \qquad r_1=r_0e^{-G},
+  \qquad c_1=M\frac{r_1}{1+r_1},
+  \label{eq:flow-update-forward}
+\end{equation}
+where $r_0=c_0/(M-c_0)$.  Set $m_i\leftarrow m_i(c_1/c_0)$ and
+$v\leftarrow M-c_1$.  For a reverse segment from $s_0$ to $s_1$, use
+\begin{equation}
+  G_R(s_0,s_1)
+  =\int_{s_0}^{s_1}\gamma(T-u)\dd u
+  =\int_{T-s_1}^{T-s_0}\gamma(t)\dd t.
+  \label{eq:reverse-flow-integral}
+\end{equation}
+Then replace $e^{-G}$ by $e^{+G_R}$.  Both updates preserve total mass up to
+floating-point roundoff.  Setting $v=M-\sum_i m_i$ after each update removes
+accumulated roundoff.
+Before evaluating the ratio, handle the two boundary cases.  If $c_0=0$,
+return the unchanged empty state.  If $v_0=0$, return the unchanged state.
+In both cases the flow vector field is zero, and these branches avoid $0/0$
+or an infinite odds ratio.
+
+\begin{algorithmblock}{Algorithm 1: Exact forward path simulation}
+\begin{enumerate}
+  \item \textbf{Input:} data state $X_0$, horizon $T$, switch time $\tau$, split rate $\beta$, split density $\kappa$, evaporation schedule $\gamma$.
+  \item Set $t\leftarrow0$, $X\leftarrow X_0$, and initialize an empty event
+  record.  Give every component a persistent lineage identifier using the
+  canonical convention of Section~\ref{sec:learning}.
+  \item \textbf{Fragmentation stage:} while $t<\tau$:
+  \begin{enumerate}
+    \item If $N(X)=0$ or $N(X)=N_{\max}$, apply the forward flow to $\tau$,
+    set $t\leftarrow\tau$, and stop this stage.
+    \item Draw $E\sim\operatorname{Exp}(1)$ and seek the smallest $t'>t$
+    satisfying
+    \begin{equation*}
+      \int_t^{t'}N(X)\beta(u)\dd u=E.
+    \end{equation*}
+    If no solution exists before $\tau$, apply the flow to $\tau$, set
+    $t\leftarrow\tau$, and stop this stage.  For constant $\beta>0$, this is
+    $t'=t+E/[N(X)\beta]$; if $\beta=0$, no solution exists.
+    \item Apply the flow from $t$ to $t'$ and set $t\leftarrow t'$.
+    \item Sample a parent uniformly and sample $(\rho,u)\sim\kappa_t$.
+    \item Apply $X\leftarrow\splitmap_i(X;\rho,u)$.  Record the time, parent identifier, child identifiers, and split mark.
+  \end{enumerate}
+  \item Set $t\leftarrow\tau$ if the fragmentation loop ended at the stage
+  boundary.
+  \item \textbf{Deletion stage:} for every component alive at $\tau$, independently draw $D_i\sim\operatorname{Uniform}(\tau,T)$.  Sort the deletion times.
+  \item Traverse the sorted times.  Before each deletion, apply the forward
+  flow from $t$ to $D_i$, set $t\leftarrow D_i$, record the component state
+  $(m_i,z_i)$ immediately before deletion, and apply
+  $X\leftarrow\deathmap_i(X)$.
+  \item Apply the flow from $t$ to $T$ if needed, set $t\leftarrow T$, and
+  set $X_T=\emptyconfig$.
+  \item \textbf{Return:} the event record and the reversible flow segments.
+\end{enumerate}
+\end{algorithmblock}
+
+The deletion times can be sampled independently because Stage E contains no splits and every component has the same hazard \eqref{eq:death-hazard}.  Sorting them is equivalent to simulating competing deletion clocks.
+
+\begin{algorithmblock}{Algorithm 2: One stochastic training step}
+\begin{enumerate}
+  \item Sample a minibatch of data.  For normalized raw weights, also draw
+  $\xi\sim q_\epsilon$ and form the augmented state $X_0$ using
+  \eqref{eq:reservoir-dequantization}.  Simulate one forward history for
+  each $X_0$ using Algorithm~1.
+  \item Reverse each history: reverse the event order, turn deletions into births with their recorded $(m,z)$ marks, and turn splits into merges of the recorded sibling lineages.
+  \item Record the leaf budget $L=N(X_\tau)$ and evaluate:
+  \begin{itemize}
+    \item the leaf-count term $\log\Pi_\theta(L\mid M,y)$;
+    \item for each birth, the absolute-mass log density
+    \begin{equation*}
+      \log A_\theta^{(m)}(m,z\mid X,s,L)
+      =\log A_\theta^{(\omega)}(m/v,z\mid X,s,L)-\log v;
+    \end{equation*}
+    \item for each merge,
+    $\log\Lambda_\theta^C(X,s)+\log\pi_\theta(a,b\mid X,s)$.
+  \end{itemize}
+  In sparse mode, enforce the nonzero-support requirement stated after
+  \eqref{eq:sparse-total-merge}; otherwise an observed merge can have
+  infinite negative log likelihood.
+  \item Estimate the merge survival integral in \eqref{eq:path-loss}.
+  Either sample uniform times as in \eqref{eq:uniform-integral-estimator},
+  or use the interval-length-weighted stratification in
+  \eqref{eq:stratified-integral-estimator}.  Birth times have a fixed law and
+  require no learned survival term.
+  \item Average \eqref{eq:path-loss} over the minibatch, differentiate it, and update $\theta$.
+  \item If a numerical ELBO is wanted, also accumulate the prescribed
+  forward density, joint Jacobian, fixed birth-time density, and any
+  dequantization terms.  None is needed for the gradient with respect to
+  $\theta$.
+\end{enumerate}
+\end{algorithmblock}
+
+\begin{algorithmblock}{Algorithm 3: Event-driven reverse sampling by thinning}
+\begin{enumerate}
+  \item \textbf{Input:} trained model, $M$, condition $y$, horizon $T$,
+  switch time $\tau$, and valid upper envelopes for merge rates.
+  \item Set $s\leftarrow0$ and $X\leftarrow\emptyconfig$.
+  Sample $L\sim\Pi_\theta(\cdot\mid M,y)$.
+  \item \textbf{Nucleation stage, $0<s<T-\tau$:}
+  \begin{enumerate}
+    \item If $L=0$, apply reverse growth from $0$ to $T-\tau$ (the empty
+    state remains unchanged), set $s\leftarrow T-\tau$, skip the remaining
+    nucleation substeps, and continue to the coagulation stage.
+    \item Draw $L$ independent times from
+    $\operatorname{Uniform}(0,T-\tau)$ and sort them as
+    $0<s_1<\cdots<s_L<T-\tau$.
+    \item For $j=1,\ldots,L$, apply reverse growth from the current time to
+    $s_j$, set $s\leftarrow s_j$, sample $(\omega,z)$ from
+    \eqref{eq:birth-mixture}, set $m=\omega v$, and apply
+    $X\leftarrow\birthmap_{m,z}(X)$.
+    \item After the last birth, apply reverse growth to $T-\tau$ and set
+    $s\leftarrow T-\tau$.
+  \end{enumerate}
+  \item \textbf{Coagulation stage, $T-\tau<s<T$:}
+  \begin{enumerate}
+    \item If $N(X)<2$, apply reverse growth to $T$ and stop.  If a sparse
+    candidate set is empty, fall back to the full pair set by default, or
+    advance only to the next scheduled candidate-refresh time.  Stop early
+    only if emptiness is known to remain valid until $T$.
+    \item Choose an interval $I=[s,s_I]$ and a valid upper envelope
+    $\overline K$ for $\Lambda_\theta^C$ along its deterministic flow.  For
+    full pair scoring, a direct choice is
+    \begin{equation*}
+      \overline K=\binom{N(X)}{2}\sup_{u\in I}k_{\max}(u).
+    \end{equation*}
+    In sparse mode, replace the binomial factor by a valid upper bound on
+    $|\mathcal C(X_u)|$ over $u\in I$.
+    If $\overline K=0$, flow to $s_I$, set $s\leftarrow s_I$, and recompute;
+    return to the coagulation-stage test, and stop only when $s_I=T$.
+    \item Draw $E_K\sim\operatorname{Exp}(\overline K)$.  If
+    $s+E_K\geq s_I$,
+    flow to $s_I$, set $s\leftarrow s_I$, and return to the coagulation-stage
+    test.  Otherwise flow to $s+E_K$ and set $s\leftarrow s+E_K$.
+    \item Accept with probability
+    $\Lambda_\theta^C(X,s)/\overline K$.  On acceptance, sample an unordered
+    pair from $\pi_\theta(a,b\mid X,s)$ and apply
+    $X\leftarrow\mergemap_{ab}(X)$.  Whether accepted or rejected, recompute
+    or revalidate the next envelope and repeat the coagulation-stage test.
+  \end{enumerate}
+  \item Return the unordered component set and report the remaining
+  reservoir $v$.  For a nonempty normalized-weight output, decode
+  $w_i=m_i/\sum_jm_j$; treat the empty set as a separate outcome.
+\end{enumerate}
+\end{algorithmblock}
+
+The thinning algorithm assumes a finite envelope on each interval.  If an
+unbounded bridge schedule is deliberately used near $T$, simulate it through
+its integrated hazard or a time change; a single finite envelope extending
+to $T$ does not exist.
+
+When analytic envelopes are inconvenient, a time grid may replace merge
+thinning.  At the left endpoint $(X,s)$, evaluate all merge rates and set
+$\Lambda=K_\theta^{\mathrm{tot}}(X,s)$.  Fix a step-size tolerance
+$\rho_{\mathrm{grid}}\in(0,1)$ and choose $\Delta\leq T-s$.  When
+$\Lambda>0$, also require
+$\Lambda\Delta\leq\rho_{\mathrm{grid}}$ and use
+\begin{equation}
+  p_{\mathrm{event}}=1-e^{-\Lambda\Delta}.
+  \label{eq:grid-event-probability}
+\end{equation}
+Draw a Bernoulli variable with this probability.  If it is one, draw and
+retain a pair from $K_\theta(a,b\mid X,s)/\Lambda$.  Apply exact reverse
+growth from $s$ to $s+\Delta$, set $s\leftarrow s+\Delta$, and then merge the
+retained pair if an event was drawn.  Thus rates and pair probabilities are
+frozen at the left endpoint and at most one event occurs per step.  This is a
+first-order approximation and converges as $\max\Delta\to0$.  If a
+multiple-event tau-leap is used instead, events must be applied sequentially
+because each merge changes both the available pairs and their rates.  The
+grid changes timing accuracy but not mass conservation.  When $\Lambda=0$,
+set $p_{\mathrm{event}}=0$, apply only the growth update over $\Delta$, and
+do not evaluate $K_\theta/\Lambda$.
+
+\subsection{Computational complexity}
+
+Let $C_{\mathrm{birth}}(N)$ be the cost of one birth-mark evaluation at
+cardinality $N$, and let $C_{\mathrm{enc}}(N)$ be the cost of one set-encoder
+evaluation.  Let $N_\ell$ be the active cardinality at birth evaluation
+$\ell$.  Let $P_C$ be the number of merge-network evaluations, including
+accepted events, rejected thinning proposals, and survival-integral queries,
+and let $N_j$ be the active cardinality at its $j$th evaluation.  Sorting
+birth times costs $O(L\log L)$.  With full pair scoring, the total sampling
+and rate-evaluation cost is
+\begin{equation}
+  O\!\left(
+    L\log L
+    +\sum_{\ell=1}^{L}C_{\mathrm{birth}}(N_\ell)
+    +\sum_{j=1}^{P_C}
+      \left[C_{\mathrm{enc}}(N_j)+N_j^2\right]
+  \right).
+  \label{eq:full-complexity}
+\end{equation}
+A sparse $k$-neighbor candidate graph replaces $N_j^2$ by
+$|\mathcal C(X_j)|=O(N_jk)$.  Batched survival evaluations dominate training
+when many quadrature times are used; caching the fixed reversed path states
+and batching all queried times reduces overhead.
+
+\section{Further theoretical properties}
+\label{sec:properties}
+
+\subsection{Endpoint error is controlled by path error}
+
+Let $\mathbb P^*$ be the exact augmented reverse path law obtained from
+Theorem~\ref{thm:reverse-kernel}, and let $\mathbb P_\theta$ be the learned
+reverse path law.  Both begin at $\emptyconfig$ and first sample their
+respective leaf budgets.  Write $P_{\mathrm{data}}$ and $P_\theta^T$ for
+their endpoint probability measures.  These are induced by the augmented
+data law and learned endpoint densities, respectively.
+
+\begin{theorem}[Path-to-endpoint error bound]
+\label{thm:endpoint-bound}
+If $\mathbb P^*\ll\mathbb P_\theta$, then
+\begin{equation}
+  \KL(P_{\mathrm{data}}\,\|\,P_\theta^T)
+  \leq
+  \KL(\mathbb P^*\,\|\,\mathbb P_\theta).
+  \label{eq:data-processing-kl}
+\end{equation}
+Consequently,
+\begin{equation}
+  \TV(P_{\mathrm{data}},P_\theta^T)
+  \leq
+  \sqrt{\frac12\KL(\mathbb P^*\,\|\,\mathbb P_\theta)}.
+  \label{eq:pinsker-endpoint}
+\end{equation}
+\end{theorem}
+
+\begin{proof}
+The endpoint is a measurable function of the full path.  Relative entropy cannot increase under a measurable map, which proves \eqref{eq:data-processing-kl}.  Equation~\eqref{eq:pinsker-endpoint} is Pinsker's inequality.
+\end{proof}
+
+For normalized observations, applying the decoder
+\eqref{eq:normalized-decoder} is another measurable map.  The same
+data-processing argument therefore also bounds the mismatch between the
+decoded nonempty endpoint laws, with the empty outcome retained as its
+separate atom.
+
+When the exact and learned laws use the same deterministic flow, the same
+conditional birth-time law, a common record reference measure and support,
+and integrable intensities, the path-space KL decomposes into the leaf-count
+KL, conditional birth-mark KL terms, and the merge-intensity divergence in
+\eqref{eq:intensity-divergence}.  Equivalently, the \emph{population excess}
+of the full reverse-record negative log likelihood over its value at the
+exact reverse law equals this path KL.  It is this excess risk, not the raw
+nonnegative loss value, that upper-bounds the endpoint KL through
+Theorem~\ref{thm:endpoint-bound}.  If the flow, timing law, or control law is
+also learned, its corresponding path-space term must be added; incompatible
+supports give infinite KL.
+
+\subsection{Hard conservation is stronger than a penalty}
+
+\begin{corollary}[Zero structural conservation error]
+In exact arithmetic, every sample returned by Algorithm~3 satisfies
+\begin{equation}
+  v+\sum_i m_i=M.
+\end{equation}
+This statement holds for every parameter value $\theta$, not only at an optimum.
+\end{corollary}
+
+\begin{proof}
+Algorithm~3 is a composition of the reverse growth flow, birth maps, and merge maps.  Proposition~\ref{prop:event-conservation} shows that each map is conservative.
+\end{proof}
+
+This is why the proposed method does not include a mass-conservation loss.  A penalty can make violations small on average; it cannot provide the above structural guarantee.
+
+\subsection{Conditioning on varying total mass}
+
+If total mass varies across observations, first model
+\begin{equation}
+  M\sim p_\vartheta(M\mid y)
+\end{equation}
+with a one-dimensional density, or treat $M$ as observed conditioning information.  Conditional on the sampled or supplied $M$, the entire coagulation--fragmentation process remains conservative.  Mixing examples with different $M$ without either step would make the claimed conservation law ill-defined.
+The parameterization above supplies $\ell_M=\log(M/M_{\mathrm{ref}})$ to the encoder, birth, pair,
+and total-rate heads.  Omitting that input would restrict the model to
+scale-invariant conditional laws even if $M$ were sampled separately.
+In the first case, training adds
+\begin{equation}
+  \mathcal L_M=-\log p_\vartheta(M\mid y),
+\end{equation}
+and Algorithm~3 samples $M\sim p_\vartheta(\cdot\mid y)$ before initializing
+$\emptyconfig$.  In the experiments proposed here, we instead condition on
+or normalize $M$ so that this extra head is not required.
+
+\subsection{Feature diffusion is outside the present model}
+
+All theorems, likelihoods, and algorithms in this paper assume deterministic
+feature motion between jumps.  Adding Brownian feature noise would require a
+reverse-score or Girsanov term and an SDE solver.  That is a possible future
+extension, but it is not part of the model analyzed here.
+
+\section{Extension: locally controlled evaporation}
+\label{sec:local-control}
+
+\subsection{What the hair-dryer observation adds}
+
+The mirror episode suggests more than a global evaporation schedule.  A
+hair dryer clears a small region, the user sees which regions remain covered,
+and the dryer is moved again.  The useful abstract properties are therefore
+\emph{locality}, \emph{sequential action}, and \emph{feedback}.  This section
+adds those properties without changing the split, merge, deletion, or birth
+maps of the core model.
+
+There is also an important distinction.  On a real mirror, the reflected
+face already exists behind the droplets.  Literal mirror clearing is thus a
+restoration or de-occlusion problem, not unconditional generation.  We use
+the hair dryer as motivation for a spatial control mechanism.  We do not
+claim that the hidden face and the generated weighted set are the same
+mathematical object.
+
+\subsection{A spatial control field}
+
+Some coordinates of $z_i$ need not be spatial.  Let
+$x_i^{\mathrm{sp}}=\operatorname{pos}(z_i)\in\R^{q_s}$ be a specified spatial projection,
+and let $a_t:\R^{q_s}\to[0,1]$ describe where the dryer acts at forward
+time $t$.
+A convenient finite representation uses $K_{\mathrm{basis}}$ nonnegative
+spatial basis functions satisfying
+$\sum_{k=1}^{K_{\mathrm{basis}}}\psi_k(x)\leq1$:
+\begin{equation}
+  a_t(x)=\sum_{k=1}^{K_{\mathrm{basis}}}a_{t,k}\psi_k(x),
+  \qquad a_{t,k}\in[0,1].
+  \label{eq:local-control-basis}
+\end{equation}
+The functions may be image patches, radial kernels, or cells of a spatial
+grid.  The coefficient vector determines the location and strength of the
+current action.
+
+For component $i$, let
+\begin{equation}
+  \lambda_i(t,X,a_t)
+  =\lambda_0(t)+\lambda_1(t)a_t(x_i^{\mathrm{sp}})\geq0,
+  \label{eq:local-evaporation-rate}
+\end{equation}
+where $\lambda_0(t),\lambda_1(t)\geq0$, or use any bounded nonnegative
+permutation-equivariant rate.  Replace the
+global flow by
+\begin{align}
+  \frac{\dd m_i}{\dd t}
+  &=-\lambda_i(t,X_t,a_t)\frac{v}{M}m_i,
+  \label{eq:controlled-flow-mi}\\
+  \frac{\dd v}{\dd t}
+  &=\frac{v}{M}\sum_{i=1}^{N(X_t)}
+    \lambda_i(t,X_t,a_t)m_i,
+  \label{eq:controlled-flow-v}\\
+  \frac{\dd z_i}{\dd t}&=0.
+\end{align}
+The original model is recovered by setting
+$\lambda_i(t,X,a)=\gamma(t)$ for every component.  Unlike the global flow,
+the controlled flow generally changes relative component masses and does
+not reduce to one scalar odds equation.
+
+\begin{proposition}[Conservation and positivity under local control]
+\label{prop:controlled-conservation}
+Assume the action path is piecewise continuous.  Assume the rates
+$\lambda_i$ are bounded, nonnegative, and uniformly Lipschitz in the state
+on the compact mass simplex, uniformly over time and admissible actions.
+Then the controlled ODE has a unique solution on every finite time interval.  If initially
+$m_i\geq0$, $v\geq0$, and $v+\sum_i m_i=M$, these properties hold for all
+later times.  If the rates are permutation equivariant, so is the flow.
+\end{proposition}
+
+\begin{proof}
+On each interval where the action is continuous, the regularity assumptions
+give a unique local solution; concatenating the intervals handles action
+jumps.  The state remains
+in the compact mass simplex, so the bounded vector field cannot explode and
+the solution extends through every finite interval.  At $m_i=0$, the right
+side of \eqref{eq:controlled-flow-mi} is zero.  At $v=0$, all mass
+derivatives in \eqref{eq:controlled-flow-mi}--\eqref{eq:controlled-flow-v}
+are zero.  Thus no coordinate can cross below zero.  Finally,
+\begin{equation*}
+  \frac{\dd}{\dd t}\left(v+\sum_i m_i\right)
+  =\frac{v}{M}\sum_i\lambda_i m_i
+   -\frac{v}{M}\sum_i\lambda_i m_i=0.
+\end{equation*}
+The total is therefore $M$.  Relabeling the components only relabels an
+equivariant vector field, which proves permutation equivariance.
+\end{proof}
+
+\subsection{Conditional time reversal}
+
+The cleanest exact construction treats the complete action path
+$a_{0:T}$ as known conditioning information.  Let $P_t^a$ and $Q_t^a$
+denote the forward marginal and jump kernel conditional on this path.  The
+reverse jumps still satisfy the same flux identity,
+\begin{equation}
+  P_t^a(\dd Y)\overline Q_{T-t}^a(Y,\dd X)
+  =P_t^a(\dd X)Q_t^a(X,\dd Y).
+  \label{eq:controlled-flux-reversal}
+\end{equation}
+Between jumps, the reverse traverses the controlled ODE backward:
+\begin{align}
+  \frac{\dd m_i}{\dd s}
+  &=+\lambda_i(T-s,Y_s,a_{T-s})\frac{v}{M}m_i,
+  \label{eq:controlled-reverse-mi}\\
+  \frac{\dd v}{\dd s}
+  &=-\frac{v}{M}\sum_i
+    \lambda_i(T-s,Y_s,a_{T-s})m_i.
+  \label{eq:controlled-reverse-v}
+\end{align}
+Thus the reverse process performs stronger growth in the spatial regions
+that were evaporated more strongly in the forward direction.
+
+The closed-form flow Jacobian \eqref{eq:flow-jacobian} must be replaced by
+an ODE Jacobian.  Let $b^a(m,t)$ be the vector formed by the right sides of
+\eqref{eq:controlled-flow-mi}, with $v=M-\sum_i m_i$.  For a no-jump
+segment from $r$ to $t$, additionally assume that $b^a(\cdot,t)$ is $C^1$
+on the mass-simplex interior and has integrable divergence along the
+trajectory.  Liouville's formula then gives
+\begin{equation}
+  \log\left|\det D\Phi_{r,t}^{a}(m_r)\right|
+  =\int_r^t \nabla_m\!\cdot b^a(m_u,u)\dd u.
+  \label{eq:controlled-flow-jacobian}
+\end{equation}
+Equivalently, the multiplicative flow factor used in a change of variables is
+\begin{equation}
+  J_{\mathrm{flow}}^a(r,t)
+  =\exp\!\left\{
+    \int_r^t \nabla_m\!\cdot b^a(m_u,u)\dd u
+  \right\}.
+  \label{eq:controlled-flow-factor}
+\end{equation}
+The log factor can be integrated together with the state.  When each
+$\lambda_i$ depends on $(t,x_i^{\mathrm{sp}},a_t)$ but not on the masses,
+\begin{equation}
+  \nabla_m\!\cdot b^a(m,t)
+  =\frac{1}{M}\sum_i\lambda_i(t,x_i^{\mathrm{sp}},a_t)(m_i-v).
+  \label{eq:controlled-flow-divergence}
+\end{equation}
+For a mass-dependent neural rate, automatic differentiation gives the full
+divergence.  Equation~\eqref{eq:controlled-flow-divergence} treats the action
+on each segment as fixed conditioning information.  If the action is
+recomputed differentiably from the current state, the divergence must also
+differentiate through that controller.
+
+The reverse merge-rate factor $1/m$ in \eqref{eq:exact-merge-rate} is
+unchanged.  Separately, every forward split still contributes its parent
+mass $m$ to the joint-history Jacobian in
+\eqref{eq:joint-history-jacobian}.  Each global-flow factor in that Jacobian
+is replaced by $J_{\mathrm{flow}}^a$ from
+\eqref{eq:controlled-flow-factor}.  For one prescribed control path, the
+algebraic form of the trainable jump loss \eqref{eq:path-loss} is unchanged,
+but $A_\theta$ and $K_\theta$ must condition on that path, or on a sufficient
+current control-state encoding.  If the control or controlled-flow
+parameters are learned jointly with the generator, the action density and
+controlled-flow Jacobian are parameter-dependent and must also be included
+in the objective.
+
+\subsection{Feedback and adaptive stopping}
+
+An open-loop controller fixes $a_{0:T}$ before the process starts.  The
+mirror story instead suggests a closed-loop controller.  At decision time
+$t_k$, let $o_k$ be an observation or uncertainty summary and sample
+\begin{equation}
+  a_k\sim\pi_\varphi(\,\cdot\mid X_{t_k},o_k,t_k,h_k^{\mathrm{ctrl}}),
+  \label{eq:control-policy}
+\end{equation}
+where $h_k^{\mathrm{ctrl}}$ is optional controller memory.  We take $o_k$
+and the memory update to be deterministic functions of the augmented state
+and past actions.  If either is stochastic, its transition density must also
+be included in the history likelihood.  The sampled coefficient vector is
+held fixed on $[t_k,t_{k+1})$, or interpolated by a stated deterministic
+rule, to define the continuous field $a_t$ used by the ODE.
+
+The process is Markov after augmenting its state with
+$(o_k,h_k^{\mathrm{ctrl}},a_k)$.  There is one extra point for fixed decision
+times: these are predictable transitions and are not covered by the
+no-predictable-jump condition in
+Assumption~\ref{ass:reversal-regularity}.  Let $Z_k^-$ and $Z_k^+$ be the
+augmented states immediately before and after decision $t_k$, and let
+$R_k(Z_k^-,\dd Z_k^+)$ be the forward scheduled-transition kernel.  Its
+pre- and post-decision laws are denoted by
+$\mathsf P_{t_k^-}$ and $\mathsf P_{t_k}$.  Its exact reverse is the
+discrete Bayes kernel $\overline R_k$ defined by
+\begin{equation}
+  \mathsf P_{t_k}(\dd Z^+)\overline R_k(Z^+,\dd Z^-)
+  =\mathsf P_{t_k^-}(\dd Z^-)R_k(Z^-,\dd Z^+).
+  \label{eq:scheduled-control-reversal}
+\end{equation}
+Between decision times, the continuous flow and ordinary jumps use
+\eqref{eq:controlled-flux-reversal}.  Hazard-driven random decision times
+can instead be included in the ordinary augmented jump kernel.
+Noninvertible memory updates cause no problem for
+\eqref{eq:scheduled-control-reversal}, but the forward history must retain
+the predecessor state and any sampled noise used to train its reverse.
+
+Let $J$ denote the number of control decisions in a realized trajectory.
+Three probability conventions must be kept separate:
+\begin{enumerate}
+  \item A prescribed action path is conditioning information and contributes
+  no action-density term.
+  \item If $\pi_\varphi$ is the forward controller used in the variational
+  corruption law, then
+  \begin{equation}
+    \log q_\varphi(a_{1:J},H\mid X)
+    \supset
+    \sum_k\log\pi_\varphi
+    (a_k\mid X_{t_k},o_k,t_k,h_k^{\mathrm{ctrl}}),
+    \label{eq:control-path-density}
+  \end{equation}
+  and this term enters the ELBO with a minus sign through $-\log q_\varphi$.
+  \item If actions are latent variables of the generative model, parameterize
+  a reverse scheduled kernel $\overline R_{\omega,k}$ satisfying
+  \begin{equation*}
+    Z_k^-\sim\overline R_{\omega,k}(Z_k^+,\dd Z_k^-),
+  \end{equation*}
+  or use a hazard-driven reverse action kernel.  Its eventwise log density
+  $\sum_k\log\overline r_{\omega,k}(Z_k^-\mid Z_k^+)$ enters the generative
+  path likelihood with a plus sign.
+\end{enumerate}
+An online forward controller cannot be used during generation merely by
+``reversing its actions,'' because no realized forward action path exists at
+sampling time.  Its action transitions must themselves be reversed through
+the augmented-state flux identity or modeled by the separate reverse kernel
+in item 3.
+
+Let $U_\psi(o_k)\geq0$ measure how much of the target remains unresolved.
+A simple stopping time is
+\begin{equation}
+  \tau_{\mathrm{stop}}
+  =\min\!\left\{T,\inf\{t_k:U_\psi(o_k)\leq\epsilon\}\right\},
+  \label{eq:control-stopping-time}
+\end{equation}
+where $\inf\varnothing=+\infty$.
+The controller can be learned from action demonstrations using the negative
+of \eqref{eq:control-path-density}.  It may instead be optimized with the
+cost
+\begin{equation}
+  \mathcal J_{\mathrm{ctrl}}(\varphi)
+  =\E\!\left[
+    U_\psi(o_J)
+    +\lambda_a\sum_{k=1}^{J}\operatorname{Cost}(a_k)
+    +\lambda_{\mathrm{step}}J
+  \right].
+  \label{eq:control-objective}
+\end{equation}
+The first term rewards revealing the target, the second penalizes dryer
+energy or spatial coverage, and the third penalizes long action sequences.
+This feedback objective is useful for conditional restoration or inpainting.
+For unconditional generation, the fixed horizon $T$ remains the simpler and
+better-defined stopping rule.  Equation~\eqref{eq:control-stopping-time}
+therefore defines a separate control or restoration objective; it is not
+silently part of the fixed-horizon generative model.  If adaptive stopping is
+used inside that model, the stopping decision needs an explicit probability
+or hazard and a random terminal law.  Both must appear in the forward
+variational and reverse generative path densities.
+
+\subsection{Implementation}
+
+\begin{algorithmblock}{Algorithm 4: Controlled-flow modification}
+\begin{enumerate}
+  \item Choose spatial basis functions
+  $\psi_{1:K_{\mathrm{basis}}}$.  Select one action convention: a prescribed
+  path; a forward variational controller together with a learned reverse
+  action kernel; or a generative action prior with its reverse controller.
+  \item In Algorithm~1, keep the same split and deletion events.  Between
+  events, integrate \eqref{eq:controlled-flow-mi}--\eqref{eq:controlled-flow-v}
+  and, when a numerical ELBO is required, simultaneously integrate the
+  divergence in \eqref{eq:controlled-flow-jacobian}.  Record every action,
+  observation, and controller-memory state used by the forward law.
+  \item For a prescribed path, reverse its time ordering and use $a_{T-s}$.
+  For latent or online actions at fixed decision times, train and sample
+  $\overline R_{\omega,k}$ using
+  \eqref{eq:scheduled-control-reversal}, and add
+  $\sum_k\log\overline r_{\omega,k}$ to the reverse-record log likelihood.
+  For hazard-driven decisions, use the augmented continuous-time reverse
+  kernel.  Do not replay a forward action path that does not exist at
+  generation time.
+  \item In Algorithm~3, replace each closed-form growth update by numerical
+  integration of
+  \eqref{eq:controlled-reverse-mi}--\eqref{eq:controlled-reverse-v}.
+  Birth and merge sampling are otherwise unchanged.
+  \item A prescribed path adds no action-density term.  A forward variational
+  controller contributes through $-\log q_\varphi$, whereas a generative
+  action prior or reverse policy contributes through $+\log p$.  Use
+  \eqref{eq:control-stopping-time} only for a modeled conditional revealing
+  task; otherwise retain the fixed horizon $T$.
+\end{enumerate}
+\end{algorithmblock}
+
+Use a positivity-preserving, mass-conserving ODE integrator with step
+rejection.  Recomputing $v=M-\sum_i m_i$ solely to remove floating-point
+roundoff is harmless.  Material clipping or projection, however, changes the
+numerical map and invalidates the continuous Liouville Jacobian in
+\eqref{eq:controlled-flow-jacobian}.  If such a discrete solver is used, the
+implementation must instead compute the Jacobian of its actual discrete map.
+The local model is slower than the scalar closed-form flow, so the global
+model should remain the default unless spatial control yields a measurable
+benefit.
+
+\subsection{Airflow, departure, and the modeled boundary}
+
+A physical hair dryer can also translate droplets or push them off the
+mirror.  Deterministic translation of the spatial coordinates may be
+represented by
+$\dd x_i^{\mathrm{sp}}/\dd t
+=u_{\mathrm{air}}(t,x_i^{\mathrm{sp}},a_t)$.  If water leaves the modeled
+region, transferring it directly to $v$ would incorrectly call it local
+vapor.  Introduce an escaped reservoir $e$ instead and conserve
+\begin{equation}
+  v+e+\sum_i m_i=M.
+  \label{eq:extended-mass-balance}
+\end{equation}
+A departure event removes component $i$ and adds $m_i$ to $e$; its reverse
+is an insertion drawing mass from $e$.  These transport and departure events
+are not needed for the minimal local-evaporation extension and are left out
+of the main experiments.
+
+\subsection{Experiments specific to this extension}
+
+The controlled model should first be tested on synthetic spatially
+heterogeneous sets or a conditional de-occlusion task.  Compare four matched
+controllers: global uniform action, a fixed raster scan, an uncertainty-based
+oracle, and a learned feedback policy.  Report generation or restoration
+quality together with the action energy
+$\int_0^T\|a_t\|_1\dd t$, number of control decisions, wall-clock time, and
+mass residual.  The extension is useful only if it improves quality or
+reduces computation at a matched action budget.
+
+\section{Experimental plan (results pending)}
+\label{sec:experiments}
+
+\begin{center}
+\fbox{\parbox{0.92\linewidth}{
+\textbf{Status.} No experiment in this section has been run.  The hypotheses,
+baselines, and metrics below are a prospective evaluation plan.  Numerical
+tables are intentionally blank, and the text makes no empirical claim.
+}}
+\end{center}
+
+\subsection{Research questions}
+
+\begin{description}[leftmargin=1.0cm,style=nextline]
+  \item[H1: Reverse correctness.] On a finite process with exactly computable marginals, learned reverse rates approach the analytical rates.
+  \item[H2: Benefit of coagulation.] At matched architecture and compute,
+  pairwise merging captures pair and cluster statistics better than a
+  single-component insertion model with no pair-merge operation.
+  \item[Check 1: Conservation.] Verify as an implementation check that the
+  sampler preserves total mass to numerical precision; this is a theorem,
+  not an empirical hypothesis.
+  \item[H3: Cardinality.] After sampling an auxiliary leaf budget and then
+  merging leaves, the model matches the held-out \emph{final} cardinality
+  distribution.  This does not claim that the method has no count model.
+  \item[H4: Efficiency.] Sample quality as a function of wall-clock time, event count, and peak active cardinality is competitive with trans-dimensional baselines.
+  \item[H5: Local control.] On a spatially heterogeneous conditional task,
+  the extension in Section~\ref{sec:local-control} improves quality or
+  reduces action cost relative to uniform evaporation and a fixed scan.
+\end{description}
+
+\subsection{Benchmarks}
+
+\begin{enumerate}
+  \item \textbf{Finite enumerated process.}  Use integer masses, a small
+  feature lattice, and small $N_{\max}$.  Compute $P_t$ and the exact reverse
+  generator by solving the finite Kolmogorov equation.  This tests probability-flux reversal
+  and unordered pair counting, but not the continuous $1/m$ Jacobian.
+  \item \textbf{Continuous synthetic weighted sets.}  Sample a known
+  hierarchical fragmentation process with controllable split imbalance,
+  spatial interaction strength, and cardinality.  Retain the ground-truth
+  genealogy only for evaluation.  Separately test the continuous split
+  change of variables by Monte Carlo integration to verify the $1/m$ factor.
+  \item \textbf{One real scalar-weighted set domain.}  Use a dataset in
+  which the additive scalar in the present theory is measured rather than
+  invented.  Two compatible candidates are calorimeter-hit point clouds
+  with deposited energy as $m_i$, conditioned on total deposited energy,
+  and instance-segmented droplet microscopy with calibrated droplet volume
+  as $m_i$.
+  Vector four-momentum conservation is outside the present scalar theory and
+  is left to future work.
+\end{enumerate}
+
+\subsection{Baselines}
+
+\begin{itemize}
+  \item Jump Diffusion Models with the same set encoder \cite{campbell2023transdimensional}.
+  \item Existence-Field Diffusion on spatial point-process tasks \cite{pan2026existence}.
+  \item A fixed- or cardinality-conditioned diffusion baseline.
+  \item An autoregressive split-tree model when a branching domain is used.
+  \item The analytical reverse generator on the finite benchmark.
+  \item \textbf{Critical in-house ablation:} a birth-only
+  single-component insertion process using the same backbone, parameter
+  count, training paths, and compute budget, but no pairwise merging.
+\end{itemize}
+
+\subsection{Metrics}
+
+Report:
+\begin{itemize}
+  \item reverse-rate relative error and event calibration on the exact task;
+  \item birth-mark negative log likelihood and merge-pair accuracy;
+  \item total variation or Hellinger distance between cardinality distributions;
+  \item Wasserstein distance for component-mass marginals;
+  \item pair-correlation or Ripley-$K$ error for spatial structure;
+  \item MMD, energy distance, and a classifier two-sample test on invariant set summaries;
+  \item the relative conservation residual
+  \begin{equation}
+    \epsilon_M=
+    \frac{|v+\sum_i m_i-M|}{M+10^{-12}};
+    \label{eq:conservation-metric}
+  \end{equation}
+  \item held-out ELBO on the finite task and on continuous tasks only after
+  the joint Jacobian and dequantization terms have been implemented and
+  checked; exact likelihood only where it is genuinely computable;
+  \item for local control, integrated action energy, spatial coverage,
+  control-decision count, and terminal unresolved uncertainty;
+  \item wall-clock sampling time, neural evaluations, jump count, average and maximum active cardinality, and peak memory.
+\end{itemize}
+
+\subsection{Ablations}
+
+The minimum ablation set is:
+\begin{enumerate}
+  \item pairwise coagulation versus the birth-only in-house ablation;
+  \item exact conservation versus an unconstrained penalty-based model;
+  \item learned pair kernel versus uniform and distance-only kernels;
+  \item reservoir versus no explicit reservoir;
+  \item coupled versus factorized birth marks;
+  \item full pair enumeration versus sparse candidate pairs;
+  \item several fragmentation strengths and switch times $\tau$;
+  \item for the optional extension, global control versus a fixed local scan,
+  an uncertainty oracle, and a learned feedback policy.
+\end{enumerate}
+
+All models should use identical data splits and comparable encoder capacity.
+Report five independent random seeds with 95\% bootstrap confidence intervals
+and include quality--compute curves rather than only one operating point.
+
+\subsection{Planned reporting format}
+
+\begin{table}[h]
+\centering
+\caption{Finite reverse-process validation.  Results pending.}
+\begin{tabular}{lccc}
+\toprule
+Method & Rate error & Mark NLL & Cardinality TV \\
+\midrule
+Analytical reverse & --- & --- & --- \\
+Birth-only in-house ablation & --- & --- & --- \\
+Proposed coagulation model & --- & --- & --- \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\begin{table}[h]
+\centering
+\caption{Continuous weighted-set generation.  Results pending.}
+\begin{tabular}{lcccc}
+\toprule
+Method & Set distance & Pair-stat. error & $\epsilon_M$ & Time/sample \\
+\midrule
+Cardinality-conditioned model & --- & --- & --- & --- \\
+Jump diffusion & --- & --- & --- & --- \\
+Birth-only in-house ablation & --- & --- & --- & --- \\
+Proposed coagulation model & --- & --- & --- & --- \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\section{Limitations}
+
+The method has several clear limitations.  Unrestricted pair scoring is
+quadratic in active cardinality.  Sparse candidates reduce cost but may
+remove important long-range merges.  The finite cap $N_{\max}$ and the
+auxiliary leaf-count model are practical structural choices; a poor cap or
+count model can limit support.  Simulated forward histories may also have
+high variance, so the fragmentation schedule is a modeling decision rather
+than a harmless implementation detail.
+
+The scalar conservation law is useful only when $m_i$ has a defensible
+additive meaning.  Normalizing arbitrary scalar scores to sum to one would make
+the constraint cosmetic.  The present split map preserves a Euclidean
+weighted centroid.  Categorical attributes, molecules with typed atoms, and
+systems with vector-valued conservation laws require new event maps and mark
+models.  Normalized data also require the reservoir dequantization and
+decoder described in Section~\ref{sec:state}.
+
+The prescribed-path local-control extension has an exact conditional
+reversal.  A feedback-controlled application additionally needs a
+task-specific observation model and the scheduled reverse kernels in
+\eqref{eq:scheduled-control-reversal}; Algorithm~4 specifies where these
+terms enter but does not choose one universal controller architecture.
+
+The exact terminal construction uses a dedicated deletion stage.  This is
+mathematically clean but less physically literal than simultaneous
+nucleation, growth, and coagulation.  The condensation language is therefore
+an intuition, not a claim that the algorithm implements Hertz--Knudsen
+kinetics or an equilibrium free energy.  The general jump-flux identity and
+variable-dimensional generation are also prior ideas; the claimed technical
+contribution is their conservative unordered split--merge specialization and
+the resulting learning and sampling scheme.
+
+Finally, a powerful birth-mark model could explain most of the data while
+merges add little.  The birth-only in-house ablation is therefore necessary
+to establish that coagulation provides more than an attractive
+interpretation.
+
+\section{Conclusion}
+
+We developed a complete theoretical and algorithmic specification of a mass-conserving generative process on variable-size weighted sets.  A prescribed fragmentation--evaporation process reaches an exact all-reservoir state.  Its finite-horizon reverse performs nucleation, conservative growth, and pairwise coagulation.  The reverse rates follow from probability flux, while a path-space ELBO turns simulated corruption histories into a tractable marked point-process loss.  Conservation and permutation invariance hold by construction.
+
+The remaining question is empirical rather than definitional: does pairwise
+coagulation improve modeling or efficiency compared with the birth-only
+ablation and existing variable-cardinality methods?  Section~\ref{sec:experiments}
+specifies the experiments needed to answer that question without
+presupposing the result.
+
+\appendix
+
+\section{Derivation of the reservoir dequantization formulas}
+\label{app:dequantization-derivation}
+
+This section derives both the Jacobian in
+\eqref{eq:dequantization-jacobian} and the likelihood bound in
+\eqref{eq:dequantization-bound}.  Write
+\begin{equation}
+  w_n=1-\sum_{i=1}^{n-1}w_i,
+  \qquad
+  m_i=M(1-\xi)w_i,
+  \quad i=1,\ldots,n.
+  \label{eq:appendix-dequantization-map}
+\end{equation}
+Thus $w_1,\ldots,w_{n-1}$ are the independent simplex coordinates, while
+$\xi$ determines the total amount of mass placed in the reservoir.
+
+If $\xi$ were fixed at $\xi_0$, the image would satisfy the extra equality
+$\sum_i m_i=M(1-\xi_0)$.  It would therefore have only $n-1$ mass
+coordinates inside an $n$-dimensional mass domain, and hence zero
+$n$-dimensional Lebesgue measure.  Allowing $\xi$ to vary supplies the
+missing direction.  Conversely, for any nonempty interior state,
+$\xi=v/M$ and $w_i=m_i/\sum_jm_j$ recover its unique normalized coordinates,
+as proved in Proposition~\ref{prop:encode-decode}.
+
+\subsection{Jacobian determinant}
+
+For $n=1$, we have $w_1=1$ and
+$\partial m_1/\partial\xi=-M$, so the claimed absolute determinant is
+$M=M^1(1-\xi)^0$.  Assume $n\geq2$ for the block calculation below.
+Define $a=M(1-\xi)$ and
+$\widetilde w=(w_1,\ldots,w_{n-1})^\top$.  For $i<n$,
+\begin{equation}
+  \frac{\partial m_i}{\partial w_j}=a\delta_{ij},
+  \qquad
+  \frac{\partial m_i}{\partial\xi}=-Mw_i.
+  \label{eq:appendix-jacobian-first-rows}
+\end{equation}
+Because $m_n=a(1-\sum_{i<n}w_i)=aw_n$, the final row satisfies
+\begin{equation}
+  \frac{\partial m_n}{\partial w_j}=-a,
+  \qquad
+  \frac{\partial m_n}{\partial\xi}=-Mw_n.
+  \label{eq:appendix-jacobian-last-row}
+\end{equation}
+Therefore the full Jacobian matrix is
+\begin{equation}
+  \frac{\partial(m_1,\ldots,m_n)}
+       {\partial(w_1,\ldots,w_{n-1},\xi)}
+  =
+  \begin{pmatrix}
+    aI_{n-1} & -M\widetilde w\\
+    -a\mathbf 1^\top & -Mw_n
+  \end{pmatrix}.
+  \label{eq:appendix-dequantization-jacobian-matrix}
+\end{equation}
+Using the block-determinant identity
+$\det\bigl(\begin{smallmatrix}A&B\\C&D\end{smallmatrix}\bigr)
+=\det(A)\det(D-CA^{-1}B)$ gives
+\begin{align}
+  \det J
+  &=a^{n-1}
+    \left[-Mw_n
+    -(-a\mathbf 1^\top)(aI_{n-1})^{-1}(-M\widetilde w)
+    \right]
+    \nonumber\\
+  &=a^{n-1}
+    \left[-Mw_n-M\sum_{i=1}^{n-1}w_i\right]
+    \nonumber\\
+  &=-Ma^{n-1}
+   =-M^n(1-\xi)^{n-1}.
+  \label{eq:appendix-dequantization-signed-determinant}
+\end{align}
+Taking the absolute value proves
+\begin{equation}
+  |\det J|=M^n(1-\xi)^{n-1}.
+\end{equation}
+The exponent $n-1$ appears because the normalized weight vector has
+$n-1$ independent simplex directions, each scaled by $M(1-\xi)$.  The
+remaining radial direction is controlled by $\xi$ and contributes the final
+factor $M$.  The feature coordinates are unchanged and therefore contribute
+a Jacobian factor of one.
+
+\subsection{Raw normalized-data likelihood}
+
+For compact notation, define
+\begin{equation}
+  f_\theta(\xi;w,z)
+  :=p_{\theta,n}(X(\xi))M^n(1-\xi)^{n-1},
+  \qquad 0<\xi<1.
+  \label{eq:appendix-f-xi}
+\end{equation}
+Here $p_{\theta,n}$ is the \emph{joint} endpoint density of all masses and
+features relative to $\mu_n$; it is not a separately specified density for
+$z$.  Under the change of variables above, the model density in coordinates
+$(w_{1:n-1},z_{1:n},\xi)$ is
+\begin{equation}
+  \widetilde p_\theta(w_{1:n-1},z_{1:n},\xi)
+  =f_\theta(\xi;w,z).
+  \label{eq:appendix-augmented-density}
+\end{equation}
+The same unordered counting convention is used before and after this change
+of variables, so it introduces no additional factorial.  Since $\xi$ is not
+part of the raw observation, its likelihood is obtained by marginalization:
+\begin{align}
+  p_\theta^{\mathrm{raw}}(w_{1:n-1},z_{1:n})
+  =\int_0^1 f_\theta(\xi;w,z)\dd\xi.
+  \label{eq:appendix-raw-marginal}
+\end{align}
+This integral must cover all state-implied reservoir fractions.  The
+auxiliary density $q_\epsilon$ is supported only on
+$I_\epsilon=[\epsilon_{\min},\epsilon_{\max}]$, so define the restricted
+mass
+\begin{equation}
+  Z_{I_\epsilon}(w,z)
+  :=\int_{I_\epsilon}f_\theta(\xi;w,z)\dd\xi.
+\end{equation}
+Insert $q_\epsilon(\xi)/q_\epsilon(\xi)$ only on this interval.  Then
+\begin{align}
+  p_\theta^{\mathrm{raw}}(w_{1:n-1},z_{1:n})
+  \geq Z_{I_\epsilon}(w,z)
+  =\E_{\xi\sim q_\epsilon}\left[
+    \frac{f_\theta(\xi;w,z)}{q_\epsilon(\xi)}
+  \right].
+  \label{eq:appendix-importance-identity}
+\end{align}
+The first relation is an inequality unless the endpoint model has no
+conditional mass outside $I_\epsilon$.  Monotonicity of the logarithm and
+then Jensen's inequality yield
+\begin{align}
+  \log p_\theta^{\mathrm{raw}}(w_{1:n-1},z_{1:n})
+  \geq\E_{\xi\sim q_\epsilon}\Big[
+    &\log p_{\theta,n}(X(\xi))
+    +n\log M
+    +(n-1)\log(1-\xi)
+    -\log q_\epsilon(\xi)
+  \Big],
+  \label{eq:appendix-dequantization-bound}
+\end{align}
+which is \eqref{eq:dequantization-bound}.
+
+Assume the displayed raw likelihood and $Z_{I_\epsilon}(w,z)$ are positive.
+The gap then has the usual variational interpretation.  Define
+\begin{equation}
+  p_\theta(\xi\mid w,z)
+  =\frac{f_\theta(\xi;w,z)}
+  {p_\theta^{\mathrm{raw}}(w_{1:n-1},z_{1:n})}.
+  \label{eq:appendix-dequantization-posterior}
+\end{equation}
+Then the difference between the left side of
+\eqref{eq:appendix-dequantization-bound} and its right side is
+\begin{equation}
+  \KL\!\left(q_\epsilon(\xi)\,\middle\|\,
+  p_\theta(\xi\mid w,z)\right)\geq0.
+  \label{eq:appendix-dequantization-gap}
+\end{equation}
+Equivalently, the same gap can be separated as
+\begin{equation}
+  \log\frac{p_\theta^{\mathrm{raw}}(w,z)}{Z_{I_\epsilon}(w,z)}
+  +\KL\!\left(
+    q_\epsilon(\xi)\,\middle\|\,
+    \frac{f_\theta(\xi;w,z)}{Z_{I_\epsilon}(w,z)}
+  \right).
+  \label{eq:appendix-dequantization-gap-split}
+\end{equation}
+The bound is exact only when the full conditional posterior is supported on
+$I_\epsilon$ and equals $q_\epsilon$ almost everywhere.
+
+\section{Full proof of the split counting factor}
+\label{app:counting}
+
+We give a more explicit version of the calculation behind
+Proposition~\ref{prop:reverse-split}.  Hold the $n-1$ unaffected components fixed and call their coordinate element $\dd O$.  Selecting one parent from an unordered $n$-component state changes the measure factor as
+\begin{equation}
+  \frac{1}{n!}\sum_{i=1}^{n}\dd O\dd m\dd z
+  =\frac{1}{(n-1)!}\dd O\dd m\dd z.
+  \label{eq:parent-counting}
+\end{equation}
+Adding the canonical split-mark element gives
+\begin{equation}
+  \frac{1}{(n-1)!}\dd O\dd m\dd z\dd\rho\dd u.
+  \label{eq:forward-split-volume}
+\end{equation}
+
+In the $(n+1)$-component child state, select one physical unordered pair.
+The labeled-coordinate integral contains both label assignments for its two
+members, even though the sum below is written with $a<b$.  Counting the
+candidate pairs gives
+\begin{equation}
+  \frac{1}{(n+1)!}\sum_{a<b}\dd O\dd m_a\dd m_b\dd z_a\dd z_b
+  =\frac{1}{2(n-1)!}
+  \dd O\dd m_a\dd m_b\dd z_a\dd z_b.
+  \label{eq:pair-counting}
+\end{equation}
+Lemma~\ref{lem:split-jacobian} gives
+\begin{equation}
+  \dd m_a\dd m_b\dd z_a\dd z_b
+  =m\dd m\dd\rho\dd z\dd u.
+\end{equation}
+The full labeled child integral in \eqref{eq:pair-counting} is twice the
+integral over the canonical orientation: one labeled assignment has
+$z_b-z_a\in\mathcal U_+$ and the other has its negative.  Rewriting the
+displayed measure on the one-orientation canonical chart therefore cancels
+the factor $1/2$.  On that chart, Lemma~\ref{lem:split-jacobian} gives
+\begin{equation}
+  \dd m_a\dd m_b\dd z_a\dd z_b
+  =m\dd m\dd\rho\dd z\dd u,
+\end{equation}
+so \eqref{eq:forward-split-volume} equals $1/m$ times the canonically
+oriented pair measure.  This produces \eqref{eq:exact-merge-rate}.
+
+If both $u$ and $-u$ are retained as distinct split marks, the same physical
+split has two coordinate representations and the corresponding density
+convention must compensate for that duplication.  The final physical rate
+is unchanged.  This is why the paper fixes a canonical half-space at the
+outset.
+
+\section{Forward path density and the fixed ELBO terms}
+\label{app:forward-density}
+
+Let split events occur at times $t_j^S$ with marks
+$(i_j,\rho_j,u_j)$, and let deletion events occur at $t_k^D$ with
+deleted component $i_k$.  Relative to the forward event times and split
+marks, the forward log density is
+\begin{align}
+  \log q_X^F(H)
+  ={}&
+  -\int_0^\tau
+    \ind\{N(X_t)<N_{\max}\}N(X_t)\beta(t)\dd t
+  +\sum_j
+  \left[
+    \log\beta(t_j^S)
+    +\log\kappa_{t_j^S}(\rho_j,u_j\mid X_{t_j^-},i_j)
+  \right]
+  \nonumber\\
+  &-\int_\tau^T N(X_t)\delta(t)\dd t
+  +\sum_k\log\delta(t_k^D).
+  \label{eq:forward-path-density}
+\end{align}
+The needed change of variables is the joint map $\Psi:(X,H)\mapsto R$ from
+\eqref{eq:joint-reversal-map}.  We now give its continuous determinant.  On
+a forward flow segment with $n\geq1$ live components, let
+$c=\sum_i m_i$ at the start and let $G$ be the integrated evaporation rate.
+The segment maps the total condensed mass to
+\begin{equation}
+  f_G(c)=\frac{Mce^{-G}}{M-c+ce^{-G}},
+  \qquad
+  \alpha_G(c)=\frac{f_G(c)}{c}.
+  \label{eq:flow-radial-map}
+\end{equation}
+Since $m_i'=\alpha_G(c)m_i$, the determinant on the $n$ mass coordinates is
+\begin{equation}
+  J_{\mathrm{flow}}(c,G,n)
+  =\alpha_G(c)^{n-1}f_G'(c),
+  \qquad
+  f_G'(c)=
+  \frac{M^2e^{-G}}{(M-c+ce^{-G})^2}.
+  \label{eq:flow-jacobian}
+\end{equation}
+To see this directly, $n-1$ directions preserve $c$ and are multiplied by
+$\alpha_G$; the remaining radial direction changes $c$ by $f_G'(c)$.
+
+Fix a discrete lineage pattern.  Let $\mathcal I_F$ be its nonempty flow
+segments, let $\mathcal E_S$ index its split events, and let
+$m_j^{\mathrm{parent}}$ be the parent mass immediately before split $j$.
+Composing the flow maps, split maps, deletions, and event-time reversal gives
+\begin{equation}
+  J_\Psi(X,H)
+  =\prod_{\ell\in\mathcal I_F}
+    \left[
+      \alpha_{G_\ell}(c_\ell)^{n_\ell-1}
+      f_{G_\ell}'(c_\ell)
+    \right]
+    \prod_{j\in\mathcal E_S}m_j^{\mathrm{parent}}.
+  \label{eq:joint-history-jacobian}
+\end{equation}
+An empty flow segment contributes one.  Lemma~\ref{lem:split-jacobian}
+gives each parent-mass factor.  Deletion merely moves one component's
+coordinates into its future birth mark, so its determinant is one.
+Reordering events and replacing $t$ by $T-t$ also have absolute determinant
+one.  The derivative is block triangular when event times are retained as
+coordinates, so their effect on later flow states does not alter the product
+of diagonal blocks.  Canonical orientation removes the duplicate discrete
+representation.
+On each canonical lineage chart, this determinant is the coordinate form of
+the Radon--Nikodym factor used in
+Lemma~\ref{lem:joint-history-change}.
+
+Equations \eqref{eq:forward-path-density} and
+\eqref{eq:joint-history-jacobian}, together with any reservoir
+dequantization density, supply all fixed terms in
+Theorem~\ref{thm:path-elbo}.  They are not needed for parameter gradients but
+must be included in a numerical ELBO.
+
+Although $\delta(t)$ diverges, the expression is finite for every realized history because all event times are strictly below $T$, and after the last deletion $N(X_t)=0$.  Equivalently, one may evaluate the deletion contribution directly using the uniform deletion-time density $1/(T-\tau)$ for each component alive at $\tau$.
+
+\section{Derivation of the point-process loss}
+\label{app:loss-derivation}
+
+Conditional on $L$, the ordered Stage-N birth times have joint density
+$L!/S_N^L$.  Birth marks are sampled sequentially from
+$A_\theta^{(m)}$.  In
+Stage C, the usual marked point-process survival calculation gives the
+reverse-record log density
+\begin{align}
+  \log\mathcal L_\theta(R)
+  ={}&\log\Pi_\theta(L\mid M,y)
+  +\log(L!)-L\log S_N
+  +\sum_{e\in\mathcal E_B}
+    \log A_\theta^{(m)}(m_e,z_e\mid X_{s_e^-},s_e,L)
+  \nonumber\\
+  &-\int_{S_N}^{T}K_\theta^{\mathrm{tot}}(X_s,s)\dd s
+  +\sum_{e\in\mathcal E_C}
+    \log K_\theta(a_e,b_e\mid X_{s_e^-},s_e).
+  \label{eq:reverse-record-density}
+\end{align}
+The negative of the $\theta$-dependent terms is exactly
+\eqref{eq:path-loss}.  The fixed birth-time density explains why no learned
+Stage-N survival integral appears there.
+
+\section{A finite-state validation model}
+\label{app:finite-validation}
+
+The exact experiment in Section~\ref{sec:experiments} can use the following finite analogue.
+
+Let total mass be an integer $M_{\mathrm{int}}$, features lie on a lattice
+$\{1,\ldots,K_{\mathrm{lat}}\}$, and component masses are positive
+integers.  Restrict cardinality to $N_{\max}$ and use only discrete split
+marks that keep masses and features on these lattices.  Enumerate every
+unordered multiset
+\begin{equation}
+  X=\left(v;\{(m_i,z_i)\}_{i=1}^{n}\right)
+\end{equation}
+with integer entries satisfying the mass constraint.  Set $\gamma\equiv0$
+in this validation toy, because the continuous evaporation ODE does not
+preserve integer masses.  Define the \emph{forward} generator $G_t$ using
+only the discrete split and deletion maps.  Births and merges will appear in
+its time reversal rather than being added to the forward generator.
+
+Use the row-vector convention for the marginal probability vector $P_t$:
+\begin{equation}
+  \frac{\dd P_t}{\dd t}=P_tG_t.
+  \label{eq:finite-forward-equation}
+\end{equation}
+This finite ODE can be integrated directly for a time-dependent schedule.
+On an interval where $G_t$ is constant, its exact update is
+$P_{t+\Delta}=P_t\exp(\Delta G_t)$.  The singular deletion schedule is not
+piecewise constant, so it should be handled by the ODE or its known
+integrated hazard, not by one constant-matrix exponential.  Compute reverse
+rates for $t<T$ and take the all-reservoir terminal law as the limit
+$t\uparrow T$.
+The exact reverse off-diagonal generator is
+\begin{equation}
+  \overline G_{T-t}(Y,X)
+  =G_t(X,Y)\frac{P_t(X)}{P_t(Y)},
+  \qquad X\neq Y, P_t(Y)>0,
+  \label{eq:finite-reverse-generator}
+\end{equation}
+and diagonal entries make rows sum to zero.  This benchmark can verify flux
+reversal, pair counting, the training objective, endpoint distributions, and
+conservation without numerical density estimation.  Because it uses counting
+measure, it cannot validate the continuous $1/m$ Jacobian.  That factor is
+checked separately by sampling smooth test functions on both sides of the
+change-of-variables identity in Lemma~\ref{lem:split-jacobian} and comparing
+Monte Carlo integrals.
+
+\section{Implementation checklist}
+\label{app:implementation-checklist}
+
+Before running large experiments, an implementation should pass the following tests.
+
+\begin{enumerate}
+  \item \textbf{Map inversion:} randomly split a component and merge its children; recover the original state to numerical tolerance.
+  \item \textbf{Mass:} after every flow and event, verify
+  $|v+\sum_i m_i-M|/M<10^{-10}$ in double precision.
+  \item \textbf{Permutation:} permute input components and verify invariant total rates and correspondingly permuted pair probabilities.
+  \item \textbf{Terminal state:} simulate many forward paths and verify that all are empty at $T$.
+  \item \textbf{Point-process likelihood:} on a constant-rate toy process, compare the implemented path likelihood with the analytic exponential waiting-time likelihood.
+  \item \textbf{Integral estimator:} compare Monte Carlo survival integrals with dense numerical quadrature on stored trajectories.
+  \item \textbf{Coordinate Jacobians:} compare automatic or finite-difference
+  determinants with \eqref{eq:dequantization-jacobian},
+  \eqref{eq:split-jacobian}, and \eqref{eq:flow-jacobian}; separately verify
+  the continuous $1/m$ change of variables by Monte Carlo integration.
+  \item \textbf{Birth bridge:} conditional on each tested $L$, verify that
+  exactly $L$ births occur and that their ordered times match the order
+  statistics of $L$ independent uniform variables.
+  \item \textbf{Finite reverse:} compare learned and analytical reverse generators in Appendix~\ref{app:finite-validation}.
+  \item \textbf{Thinning:} verify every proposed envelope exceeds the evaluated rate.  An invalid envelope biases samples.
+  \item \textbf{Genealogy bookkeeping:} reverse every simulated forward history and check that it returns exactly to $X_0$ before any neural model is introduced.
+\end{enumerate}
+
+\begin{thebibliography}{99}
+
+\bibitem{aldous1999deterministic}
+D.~J. Aldous.
+\newblock Deterministic and stochastic models for coalescence (aggregation and coagulation): A review of the mean-field theory for probabilists.
+\newblock \emph{Bernoulli}, 5(1):3--48, 1999.
+
+\bibitem{anderson1982reverse}
+B.~D.~O. Anderson.
+\newblock Reverse-time diffusion equation models.
+\newblock \emph{Stochastic Processes and their Applications}, 12(3):313--326, 1982.
+
+\bibitem{andreassen2019junipr}
+A.~Andreassen, I.~Feige, C.~Frye, and M.~D. Schwartz.
+\newblock JUNIPR: A framework for unsupervised machine learning in particle physics.
+\newblock \emph{European Physical Journal C}, 79:102, 2019.
+
+\bibitem{bansal2023cold}
+A.~Bansal, E.~Borgnia, H.-M.~Chu, J.~Li, H.~Kazemi, F.~Huang, M.~Goldblum, J.~Geiping, and T.~Goldstein.
+\newblock Cold Diffusion: Inverting arbitrary image transforms without noise.
+\newblock \emph{Advances in Neural Information Processing Systems}, 36, 2023.
+
+\bibitem{bergmeister2024efficient}
+A.~Bergmeister, K.~Martinkus, N.~Perraudin, and R.~Wattenhofer.
+\newblock Efficient and scalable graph generation through iterative local expansion.
+\newblock In \emph{International Conference on Learning Representations}, 2024.
+
+\bibitem{bertoin2006random}
+J.~Bertoin.
+\newblock \emph{Random Fragmentation and Coagulation Processes}.
+\newblock Cambridge University Press, 2006.
+
+\bibitem{boget2026hierarchical}
+Y.~Boget, P.~Strasser, and A.~Kalousis.
+\newblock Hierarchical discrete flow matching for graph generation.
+\newblock arXiv:2604.00236, 2026.
+
+\bibitem{campbell2023transdimensional}
+A.~Campbell, W.~Harvey, C.~Weilbach, V.~De~Bortoli, T.~Rainforth, and A.~Doucet.
+\newblock Trans-dimensional generative modeling via jump diffusion models.
+\newblock \emph{Advances in Neural Information Processing Systems}, 36, 2023.
+
+\bibitem{chen2023learning}
+T.~Chen and M.~Zhou.
+\newblock Learning to Jump: Thinning and thickening latent counts for generative modeling.
+\newblock In \emph{Proceedings of the 40th International Conference on Machine Learning}, 2023.
+
+\bibitem{conforti2022time}
+G.~Conforti and C.~L\'eonard.
+\newblock Time reversal of Markov processes with jumps under a finite entropy condition.
+\newblock \emph{Stochastic Processes and their Applications}, 144:85--124, 2022.
+
+\bibitem{green1995reversible}
+P.~J. Green.
+\newblock Reversible jump Markov chain Monte Carlo computation and Bayesian model determination.
+\newblock \emph{Biometrika}, 82(4):711--732, 1995.
+
+\bibitem{ho2020denoising}
+J.~Ho, A.~Jain, and P.~Abbeel.
+\newblock Denoising diffusion probabilistic models.
+\newblock \emph{Advances in Neural Information Processing Systems}, 33, 2020.
+
+\bibitem{lee2019settransformer}
+J.~Lee, Y.~Lee, J.~Kim, A.~Kosiorek, S.~Choi, and Y.~W. Teh.
+\newblock Set Transformer: A framework for attention-based permutation-invariant neural networks.
+\newblock In \emph{Proceedings of the 36th International Conference on Machine Learning}, 2019.
+
+\bibitem{norris1999smoluchowski}
+J.~R. Norris.
+\newblock Smoluchowski's coagulation equation: Uniqueness, nonuniqueness and a hydrodynamic limit for the stochastic coalescent.
+\newblock \emph{Annals of Applied Probability}, 9(1):78--109, 1999.
+
+\bibitem{pan2026existence}
+X.~Pan, C.~R. Shelton, R.~Mahishi, and C.~Hong.
+\newblock Existence-Field Diffusion Model for spatial point processes with variable cardinality.
+\newblock arXiv:2607.26428, 2026.
+
+\bibitem{sohldickstein2015deep}
+J.~Sohl-Dickstein, E.~Weiss, N.~Maheswaranathan, and S.~Ganguli.
+\newblock Deep unsupervised learning using nonequilibrium thermodynamics.
+\newblock In \emph{Proceedings of the 32nd International Conference on Machine Learning}, 2015.
+
+\bibitem{song2021score}
+Y.~Song, J.~Sohl-Dickstein, D.~P. Kingma, A.~Kumar, S.~Ermon, and B.~Poole.
+\newblock Score-based generative modeling through stochastic differential equations.
+\newblock In \emph{International Conference on Learning Representations}, 2021.
+
+\bibitem{zaheer2017deepsets}
+M.~Zaheer, S.~Kottur, S.~Ravanbakhsh, B.~Poczos, R.~Salakhutdinov, and A.~Smola.
+\newblock Deep Sets.
+\newblock \emph{Advances in Neural Information Processing Systems}, 30, 2017.
+
+\end{thebibliography}
+
+\end{document}
